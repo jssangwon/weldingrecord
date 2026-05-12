@@ -284,7 +284,7 @@ function App() {
       const hh = {};
       for (const k of HKEYS) hh[k] = ls.get(`wr:${k}`);
       setHist(hh);
-      const tpls = ls.get("wr:entryTpls");
+      const tpls = ls.get("wr:tpls");
       if (tpls.length) setEntryTpls(tpls);
       const pdfs = ls.get("wr:pdfList");
       if (pdfs.length) {
@@ -309,20 +309,20 @@ function App() {
     ls.set(`wr:${k}`, next);
   };
 
-  const saveTpl = async () => {
+  const saveTpl = () => {
     const name = tplName.trim();
     if (!name) return;
     const tpl = { name, date: new Date().toLocaleDateString("ko-KR"), entries: form.entries };
     const next = [tpl, ...entryTpls.filter(t => t.name !== name)].slice(0, 30);
     setEntryTpls(next);
-    ls.set("wr:entryTpls", next);
+    ls.set("wr:tpls", next);
     setTplName(""); setShowSaveDlg(false);
   };
 
-  const deleteTpl = async (name) => {
+  const deleteTpl = (name) => {
     const next = entryTpls.filter(t => t.name !== name);
     setEntryTpls(next);
-    ls.set("wr:entryTpls", next);
+    ls.set("wr:tpls", next);
   };
 
   const loadTpl = (tpl) => {
@@ -353,7 +353,7 @@ function App() {
     rd.readAsArrayBuffer(file);
   };
 
-  const openStoredPdf = async (item) => {
+  const openStoredPdf = (item) => {
     if (selPdfName === item.name && selPdfB64) return;
         try {
       const b64 = localStorage.getItem("wr:pdf:" + item.name);
