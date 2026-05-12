@@ -1,29 +1,22 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>용접기록서 자동화</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#f1f5f9;font-family:'Apple SD Gothic Neo','Malgun Gothic',sans-serif}
-</style>
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f1f5f9;font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif}</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useRef,useMemo} = React;
-const XLSX = window.XLSX;
+const {useState,useEffect,useRef,useMemo}=React;
+const XLSX=window.XLSX;
 
-/* localStorage 헬퍼 */
-const ls = {
-  get(k){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):[]; }catch{ return []; } },
-  set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} },
-};
+const ls={get(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):[];}catch{return[];}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}};
+
 const LOGO_B64="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";
 const SIGN_B64="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";
 
@@ -248,9 +241,9 @@ async function buildExcelB64(form) {
   return btoa(bin);
 }
 
-function PdfViewer({ pdfBase64, name }
-
 function AutoIn({ lb, v, onChange, h=[], onSave, onDelete, ph="", style={} }
+
+function PdfViewer({ pdfBase64, name }
 
 const MAX_E=3;
 const WFIELDS=[{k:"date",lb:"날짜",tp:"date",w:130},{k:"desc",lb:"용접내용",w:200,hk:"desc"},{k:"procNo",lb:"공정번호",w:105,hk:"procNo"},{k:"welder",lb:"용접사/ID",w:130,hk:"welder"},{k:"method",lb:"용접방법",w:105,hk:"method",pre:["FCAW","SMAW","GTAW","SAW","GMAW","EGW"]},{k:"wps",lb:"WPS NO.",w:160,hk:"wps"},{k:"part",lb:"부품명",w:115,hk:"part"},{k:"mat",lb:"재질",w:175,hk:"mat"},{k:"aws",lb:"AWS No.",w:115,hk:"aws"},{k:"heat",lb:"Heat/Lot No.",w:135,hk:"heat"},{k:"sz",lb:"Size",w:90,hk:"sz"},{k:"rmk",lb:"비고",w:150,hk:"rmk"}];
@@ -282,7 +275,7 @@ function App() {
   useEffect(() => {
     (async () => {
       const hh = {};
-      for (const k of HKEYS) hh[k] = ls.get(`wr:${k}`);
+      HKEYS.forEach(k => { hh[k] = ls.get("wr:"+k); });
       setHist(hh);
       const tpls = ls.get("wr:tpls");
       if (tpls.length) setEntryTpls(tpls);
@@ -342,7 +335,7 @@ function App() {
           bin += String.fromCharCode(...bytes.subarray(i, i + STEP));
         const b64 = btoa(bin);
         try { localStorage.setItem("wr:pdf:" + file.name, b64); }
-        catch(e) { alert("저장 용량 초과. 파일이 너무 큽니다."); setPdfLoading(false); return; }
+        catch(e) { alert("저장 용량 초과. 파일이 너무 큽니다.");  return; }
         const next = [{name:file.name}, ...pdfList.filter(p=>p.name!==file.name)].slice(0,5);
         setPdfList(next); ls.set("wr:pdfList", next);
         setSelPdfB64(b64);
@@ -361,7 +354,7 @@ function App() {
       setSelPdfB64(b64);
       setSelPdfName(item.name);
     } catch(e) { alert("PDF 로드 오류: " + e.message); }
-    finally { setPdfLoading(false); }
+    finally {  }
   };
 
   const removePdf = async (name) => {
@@ -418,14 +411,14 @@ function App() {
   };
 
   const S = {
-    card: { background:"var(--color-background-primary)", border:"0.5px solid var(--color-border-tertiary)", borderRadius:10, padding:"20px 22px", marginBottom:14 },
-    ct:   { fontSize:14, fontWeight:700, color:"var(--color-text-primary)", marginBottom:16, paddingBottom:11, borderBottom:"0.5px solid var(--color-border-tertiary)" },
+    card: { background:"#fff", border:"0.5px solid #e2e8f0", borderRadius:10, padding:"20px 22px", marginBottom:14 },
+    ct:   { fontSize:14, fontWeight:700, color:"#1e293b", marginBottom:16, paddingBottom:11, borderBottom:"0.5px solid #e2e8f0" },
     row:  { display:"flex", gap:14, marginBottom:14, flexWrap:"wrap" },
-    btn:  c => ({ padding:"8px 16px", borderRadius:7, border:"0.5px solid "+(c?"transparent":"var(--color-border-secondary)"), background:c||"var(--color-background-secondary)", color:c?"#fff":"var(--color-text-primary)", cursor:"pointer", fontSize:13, fontWeight:600 }),
-    pill: { display:"inline-flex", alignItems:"center", gap:6, background:"var(--color-background-secondary)", border:"1px solid var(--color-border-secondary)", borderRadius:20, padding:"4px 12px", fontSize:12, color:"var(--color-text-primary)", margin:"3px" },
-    th: { padding:"10px 8px", fontSize:12, fontWeight:700, color:"var(--color-text-secondary)", background:"var(--color-background-secondary)", textAlign:"center", whiteSpace:"nowrap", border:"2px solid #64748b" },
-    td: { padding:"0", verticalAlign:"middle", background:"var(--color-background-primary)", border:"2px solid #94a3b8" },
-    ta: { width:"100%", padding:"8px 10px", border:"1.5px solid var(--color-border-secondary)", borderRadius:6, fontSize:13, background:"var(--color-background-primary)", color:"var(--color-text-primary)", outline:"none", resize:"vertical", boxSizing:"border-box" },
+    btn:  c => ({ padding:"8px 16px", borderRadius:7, border:"0.5px solid "+(c?"transparent":"#cbd5e1"), background:c||"#f8fafc", color:c?"#fff":"#1e293b", cursor:"pointer", fontSize:13, fontWeight:600 }),
+    pill: { display:"inline-flex", alignItems:"center", gap:6, background:"#f8fafc", border:"1px solid #cbd5e1", borderRadius:20, padding:"4px 12px", fontSize:12, color:"#1e293b", margin:"3px" },
+    th: { padding:"10px 8px", fontSize:12, fontWeight:700, color:"#64748b", background:"#f8fafc", textAlign:"center", whiteSpace:"nowrap", border:"2px solid #64748b" },
+    td: { padding:"0", verticalAlign:"middle", background:"#fff", border:"2px solid #94a3b8" },
+    ta: { width:"100%", padding:"8px 10px", border:"1.5px solid #cbd5e1", borderRadius:6, fontSize:13, background:"#fff", color:"#1e293b", outline:"none", resize:"vertical", boxSizing:"border-box" },
   };
 
   const DlBox = () => dlHref ? (
@@ -439,7 +432,7 @@ function App() {
   ) : null;
 
   return (
-    <div style={{ minHeight:"100vh", background:"var(--color-background-tertiary)", fontFamily:"'Apple SD Gothic Neo','Malgun Gothic',sans-serif" }}>
+    <div style={{ minHeight:"100vh", background:"#f1f5f9", fontFamily:"'Apple SD Gothic Neo','Malgun Gothic',sans-serif" }}>
       <div style={{ background:"#1a3a5c", padding:"14px 22px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div>
           <div style={{ color:"#fff", fontWeight:700, fontSize:17 }}>⚡ 용접기록서 자동화</div>
@@ -496,25 +489,25 @@ function App() {
             <div style={S.card}>
               <div style={S.ct}>제품번호 (장비번호) 입력</div>
               <div style={{ marginBottom:18 }}>
-                <div style={{ fontSize:12, color:"var(--color-text-secondary)", marginBottom:7, fontWeight:600 }}>📎 엑셀 파일 드래그 또는 선택</div>
+                <div style={{ fontSize:12, color:"#64748b", marginBottom:7, fontWeight:600 }}>📎 엑셀 파일 드래그 또는 선택</div>
                 <div
                   onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                   onDragEnter={e => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={e => { e.preventDefault(); setDragOver(false); const file = e.dataTransfer.files[0]; if (file) importP(file); }}
                   onClick={() => pFR.current.click()}
-                  style={{ border: dragOver ? "2.5px solid #3b82f6" : "2px dashed #94a3b8", borderRadius:10, padding:"32px 20px", textAlign:"center", cursor:"pointer", background: dragOver ? "#eff6ff" : "var(--color-background-secondary)", transition:"all .15s" }}>
+                  style={{ border: dragOver ? "2.5px solid #3b82f6" : "2px dashed #94a3b8", borderRadius:10, padding:"32px 20px", textAlign:"center", cursor:"pointer", background: dragOver ? "#eff6ff" : "#f8fafc", transition:"all .15s" }}>
                   <div style={{ fontSize:36, marginBottom:8 }}>📂</div>
-                  <div style={{ fontSize:14, fontWeight:700, color: dragOver ? "#1d4ed8" : "var(--color-text-primary)", marginBottom:4 }}>
+                  <div style={{ fontSize:14, fontWeight:700, color: dragOver ? "#1d4ed8" : "#1e293b", marginBottom:4 }}>
                     {dragOver ? "여기에 놓으세요!" : "엑셀 파일을 여기에 드래그하세요"}
                   </div>
-                  <div style={{ fontSize:12, color:"var(--color-text-secondary)" }}>또는 클릭해서 파일 선택 &nbsp;·&nbsp; xlsx / xls / csv 지원</div>
+                  <div style={{ fontSize:12, color:"#64748b" }}>또는 클릭해서 파일 선택 &nbsp;·&nbsp; xlsx / xls / csv 지원</div>
                 </div>
                 <input ref={pFR} type="file" accept=".xlsx,.xls,.csv" style={{ display:"none" }}
                   onChange={e => { importP(e.target.files[0]); e.target.value=""; }}/>
               </div>
-              <div style={{ borderTop:"0.5px solid var(--color-border-tertiary)", paddingTop:16 }}>
-                <div style={{ fontSize:12, color:"var(--color-text-secondary)", marginBottom:7, fontWeight:600 }}>✏️ 직접 입력 (줄바꿈 또는 쉼표로 구분)</div>
+              <div style={{ borderTop:"0.5px solid #e2e8f0", paddingTop:16 }}>
+                <div style={{ fontSize:12, color:"#64748b", marginBottom:7, fontWeight:600 }}>✏️ 직접 입력 (줄바꿈 또는 쉼표로 구분)</div>
                 <div style={{ display:"flex", gap:10 }}>
                   <textarea style={{ ...S.ta, height:90, flex:1 }} value={pIn} onChange={e=>setPIn(e.target.value)}
                     placeholder={"0-624-Y-VR-0001\n0-624-Y-VR-0002\n0-624-Y-VR-0003"}/>
@@ -530,7 +523,7 @@ function App() {
                 </div>
               </div>
               {form.pNos.length === 0
-                ? <div style={{ textAlign:"center", color:"var(--color-text-tertiary)", padding:"28px 0", fontSize:13 }}>등록된 제품번호가 없습니다.</div>
+                ? <div style={{ textAlign:"center", color:"#94a3b8", padding:"28px 0", fontSize:13 }}>등록된 제품번호가 없습니다.</div>
                 : <div style={{ display:"flex", flexWrap:"wrap" }}>
                     {form.pNos.map((n, i) => (
                       <div key={i} style={S.pill}>
@@ -622,12 +615,12 @@ function App() {
                   <tbody>
                     {form.entries.map((en, i) => (
                       <tr key={i}>
-                        <td style={{ ...S.td, textAlign:"center", fontSize:15, fontWeight:700, color:"var(--color-text-secondary)", width:50 }}>{i + 1}</td>
+                        <td style={{ ...S.td, textAlign:"center", fontSize:15, fontWeight:700, color:"#64748b", width:50 }}>{i + 1}</td>
                         {WFIELDS.map(f => (
                           <td key={f.k} style={{ ...S.td, minWidth:f.w, width:f.w, height:56 }}>
                             {f.tp === "date"
                               ? <input type="date" value={en[f.k]}
-                                  style={{ width:"100%", padding:"8px 8px", border:"none", fontSize:13, background:"transparent", color:"var(--color-text-primary)", outline:"none" }}
+                                  style={{ width:"100%", padding:"8px 8px", border:"none", fontSize:13, background:"transparent", color:"#1e293b", outline:"none" }}
                                   onChange={e => updE(i, f.k, e.target.value)}/>
                               : <AutoIn
                                   v={en[f.k]}
@@ -647,7 +640,7 @@ function App() {
                   </tbody>
                 </table>
               </div>
-              <div style={{ marginTop:12, fontSize:12, color:"var(--color-text-tertiary)" }}>
+              <div style={{ marginTop:12, fontSize:12, color:"#94a3b8" }}>
                 * 셀 클릭 시 이전 입력값 자동완성 / 가로 스크롤로 모든 항목 입력 / 💾 템플릿 저장으로 자주 쓰는 셋 저장 가능
               </div>
             </div>
@@ -655,7 +648,7 @@ function App() {
             <div style={{ ...S.card, textAlign:"center" }}>
               <button style={{ background:"#27ae60", color:"#fff", border:"none", borderRadius:9, padding:"13px 36px", fontWeight:700, fontSize:15, cursor:"pointer", marginBottom:8 }}
                 onClick={makeLink}>📥 엑셀 파일 생성</button>
-              <div style={{ fontSize:12, color:"var(--color-text-tertiary)" }}>생성 후 아래 링크를 클릭하여 저장하세요</div>
+              <div style={{ fontSize:12, color:"#94a3b8" }}>생성 후 아래 링크를 클릭하여 저장하세요</div>
               <DlBox/>
             </div>
           </div>
@@ -671,15 +664,15 @@ function App() {
                 onDragLeave={() => setPdfDrag(false)}
                 onDrop={e => { e.preventDefault(); setPdfDrag(false); uploadPdf(e.dataTransfer.files[0]); }}
                 onClick={() => pdfFR.current.click()}
-                style={{ border: pdfDrag ? "2.5px solid #3b82f6" : "2px dashed #94a3b8", borderRadius:10, padding:"24px 20px", textAlign:"center", cursor:"pointer", background: pdfDrag ? "#eff6ff" : "var(--color-background-secondary)", transition:"all .15s", marginBottom: pdfList.length ? 14 : 0 }}>
+                style={{ border: pdfDrag ? "2.5px solid #3b82f6" : "2px dashed #94a3b8", borderRadius:10, padding:"24px 20px", textAlign:"center", cursor:"pointer", background: pdfDrag ? "#eff6ff" : "#f8fafc", transition:"all .15s", marginBottom: pdfList.length ? 14 : 0 }}>
                 {pdfLoading
                   ? <div style={{ fontSize:14, fontWeight:700, color:"#1a3a5c" }}>⏳ PDF 저장 중... 잠시 기다려주세요</div>
                   : <>
                       <div style={{ fontSize:30, marginBottom:6 }}>📎</div>
-                      <div style={{ fontSize:14, fontWeight:700, color: pdfDrag ? "#1d4ed8" : "var(--color-text-primary)", marginBottom:4 }}>
+                      <div style={{ fontSize:14, fontWeight:700, color: pdfDrag ? "#1d4ed8" : "#1e293b", marginBottom:4 }}>
                         {pdfDrag ? "여기에 놓으세요!" : "승인문서(PDF)를 드래그하거나 클릭하여 업로드"}
                       </div>
-                      <div style={{ fontSize:12, color:"var(--color-text-secondary)" }}>업로드한 문서는 앱을 닫아도 저장되어 다음에 바로 열립니다</div>
+                      <div style={{ fontSize:12, color:"#64748b" }}>업로드한 문서는 앱을 닫아도 저장되어 다음에 바로 열립니다</div>
                     </>}
               </div>
               <input ref={pdfFR} type="file" accept="application/pdf" style={{ display:"none" }}
@@ -706,7 +699,7 @@ function App() {
               </div>
             )}
             {!pdfLoading && pdfList.length === 0 && (
-              <div style={{ ...S.card, textAlign:"center", color:"var(--color-text-tertiary)", padding:"50px", fontSize:14 }}>
+              <div style={{ ...S.card, textAlign:"center", color:"#94a3b8", padding:"50px", fontSize:14 }}>
                 <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
                 <div style={{ fontWeight:600, marginBottom:8 }}>업로드된 승인문서가 없습니다</div>
                 <div style={{ fontSize:13 }}>위 영역에 PDF 파일을 드래그하거나 클릭하여 업로드하세요.<br/>한 번 업로드하면 이후에도 자동으로 열립니다.</div>
