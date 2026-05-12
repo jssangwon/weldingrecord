@@ -4,41 +4,637 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>용접기록서 자동화</title>
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#f1f5f9;font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+body{background:#f1f5f9;font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:14px}
+button{cursor:pointer;font-family:inherit}
+input,textarea,select{font-family:inherit}
+.hidden{display:none!important}
+.tab-content{display:none}
+.tab-content.active{display:block}
+.card{background:#fff;border:0.5px solid #e2e8f0;border-radius:10px;padding:20px 22px;margin-bottom:14px}
+.card-title{font-size:14px;font-weight:700;color:#1e293b;margin-bottom:16px;padding-bottom:11px;border-bottom:0.5px solid #e2e8f0}
+.row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.btn{padding:8px 16px;border-radius:7px;border:0.5px solid #cbd5e1;background:#f8fafc;color:#1e293b;font-size:13px;font-weight:600}
+.btn-primary{background:#1a3a5c;color:#fff;border-color:transparent}
+.btn-green{background:#27ae60;color:#fff;border-color:transparent}
+.btn-gray{background:#475569;color:#fff;border-color:transparent}
+.pill{display:inline-flex;align-items:center;gap:6px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:20px;padding:4px 12px;font-size:12px;margin:3px}
+.field-wrap{position:relative;flex:1}
+.field-label{font-size:12px;color:#64748b;margin-bottom:4px;font-weight:600}
+.field-input{width:100%;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:5px;font-size:13px;background:#fff;color:#1e293b;outline:none}
+.field-input:focus{border-color:#3b82f6}
+.dropdown{position:fixed;background:#fff;border:2px solid #3b82f6;border-radius:7px;max-height:280px;overflow-y:auto;box-shadow:0 8px 28px rgba(0,0,0,.35);z-index:9999;display:none}
+.dropdown.open{display:block}
+.dropdown-header{padding:6px 14px;font-size:11px;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0}
+.dropdown-item{display:flex;align-items:center;padding:10px 8px 10px 14px;font-size:13px;cursor:pointer;border-bottom:1px solid #e2e8f0}
+.dropdown-item:hover{background:#dbeafe}
+.dropdown-del{padding:10px 13px;color:#94a3b8;font-size:13px;border-left:1px solid #e2e8f0;flex-shrink:0}
+.dropdown-del:hover{color:#e74c3c;background:#fee2e2}
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;padding:28px 32px;box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.drag-zone{border:2px dashed #94a3b8;border-radius:10px;padding:32px 20px;text-align:center;cursor:pointer;background:#f8fafc}
+.drag-zone.over{border-color:#3b82f6;background:#eff6ff}
+.tbl{border-collapse:collapse;min-width:1500px}
+.tbl th{padding:10px 8px;font-size:12px;font-weight:700;color:#64748b;background:#f8fafc;text-align:center;white-space:nowrap;border:2px solid #64748b}
+.tbl td{padding:0;vertical-align:middle;background:#fff;border:2px solid #94a3b8;height:56px}
+.tbl td input{width:100%;padding:8px;border:none;font-size:13px;background:transparent;color:#1e293b;outline:none}
+.tbl-num{text-align:center;font-size:15px;font-weight:700;color:#64748b;width:50px}
+.dl-box{margin-top:14px;padding:18px;background:#f0faf4;border:2px solid #a5d6a7;border-radius:10px;text-align:center}
 </style>
 </head>
 <body>
-<div id="root"></div>
+
+<!-- 헤더 -->
+<div style="background:#1a3a5c;padding:14px 22px;display:flex;align-items:center;justify-content:space-between">
+  <div>
+    <div style="color:#fff;font-weight:700;font-size:17px">⚡ 용접기록서 자동화</div>
+    <div style="color:#90b8d8;font-size:11px;margin-top:2px">WELDING RECORD AUTOMATION SYSTEM</div>
+  </div>
+  <button class="btn-green btn" id="btnMakeXlsx" onclick="makeXlsx()">📥 파일 생성</button>
+</div>
+
+<!-- 탭 -->
+<div id="tabBar" style="background:#1e2d3d;display:flex;padding:0 18px"></div>
+
+<!-- 내용 -->
+<div style="padding:18px;max-width:1600px;margin:0 auto">
+
+  <!-- 탭0: 기본정보 -->
+  <div id="tab0" class="tab-content active">
+    <div class="card">
+      <div class="card-title">문서 기본정보</div>
+      <div class="row">
+        <div class="field-wrap" id="fw-docNo"></div>
+      </div>
+      <div class="row">
+        <div class="field-wrap" id="fw-cust" style="flex:1"></div>
+        <div class="field-wrap" id="fw-proj" style="flex:2"></div>
+      </div>
+      <div class="row">
+        <div class="field-wrap" id="fw-prod" style="flex:2"></div>
+        <div class="field-wrap" id="fw-drwNo" style="flex:2"></div>
+      </div>
+    </div>
+    <div class="card" style="background:#f0f7ff;border-color:#bed3f5">
+      <div style="font-size:13px;color:#1a3a5c">💡 입력 이력은 이 브라우저에 저장됩니다. 클릭하면 자동완성 목록이 나타납니다.</div>
+    </div>
+    <div id="dlBox0"></div>
+  </div>
+
+  <!-- 탭1: 제품번호 -->
+  <div id="tab1" class="tab-content">
+    <div class="card">
+      <div class="card-title">제품번호 입력</div>
+      <div style="margin-bottom:18px">
+        <div class="field-label">📎 엑셀 파일 드래그 또는 선택</div>
+        <div class="drag-zone" id="dropZone" onclick="document.getElementById('pFileInput').click()">
+          <div style="font-size:36px;margin-bottom:8px">📂</div>
+          <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:4px">엑셀 파일을 여기에 드래그하세요</div>
+          <div style="font-size:12px;color:#64748b">또는 클릭해서 선택 · xlsx / xls / csv</div>
+        </div>
+        <input type="file" id="pFileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(this.files[0]);this.value=''"/>
+      </div>
+      <div style="border-top:0.5px solid #e2e8f0;padding-top:16px">
+        <div class="field-label">✏️ 직접 입력 (줄바꿈 또는 쉼표로 구분)</div>
+        <div style="display:flex;gap:10px">
+          <textarea id="pInput" rows="4" style="flex:1;padding:8px 10px;border:1.5px solid #cbd5e1;border-radius:6px;font-size:13px;resize:vertical;outline:none" placeholder="0-624-Y-VR-0001&#10;0-624-Y-VR-0002"></textarea>
+          <button class="btn btn-primary" style="align-self:flex-start" onclick="addProducts()">+ 추가</button>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="productCard">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin-bottom:0">등록된 제품번호</div>
+        <div id="qtyBadge" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:7px;padding:6px 14px;font-size:14px;font-weight:700;color:#2e7d32">수량: -</div>
+      </div>
+      <div id="productList" style="display:flex;flex-wrap:wrap">
+        <div style="text-align:center;color:#94a3b8;padding:28px 0;font-size:13px;width:100%">등록된 제품번호가 없습니다.</div>
+      </div>
+      <div style="margin-top:14px;display:flex;justify-content:flex-end">
+        <button class="btn" onclick="clearProducts()">전체 삭제</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 탭2: 작업내역 -->
+  <div id="tab2" class="tab-content">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div class="card-title" style="margin-bottom:0" id="entryTitle">작업 내역 (1 / 3행)</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="font-size:12px;padding:7px 13px" onclick="openLoadDlg()">📂 불러오기</button>
+          <button class="btn btn-gray" style="font-size:12px;padding:7px 13px" onclick="openSaveDlg()">💾 템플릿 저장</button>
+          <button class="btn btn-primary" id="btnAddRow" onclick="addRow()">+ 행 추가</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl" id="entryTable">
+          <thead id="entryHead"></thead>
+          <tbody id="entryBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="text-align:center">
+      <button class="btn btn-green" style="border-radius:9px;padding:13px 36px;font-size:15px;margin-bottom:8px" onclick="makeXlsx()">📥 엑셀 파일 생성</button>
+      <div id="dlBox2"></div>
+    </div>
+  </div>
+
+  <!-- 탭3: 승인문서 -->
+  <div id="tab3" class="tab-content">
+    <div class="card">
+      <div class="card-title">📄 승인문서 관리</div>
+      <div class="drag-zone" id="pdfDropZone" onclick="document.getElementById('pdfInput').click()">
+        <div style="font-size:30px;margin-bottom:6px">📎</div>
+        <div style="font-size:14px;font-weight:700;color:#1e293b;margin-bottom:4px">승인문서(PDF) 업로드</div>
+        <div style="font-size:12px;color:#64748b">브라우저에 저장됩니다 · 최대 5개</div>
+      </div>
+      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" onchange="uploadPdf(this.files[0]);this.value=''"/>
+      <div id="pdfBtnList" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px"></div>
+    </div>
+    <div id="pdfViewer"></div>
+    <div id="pdfEmpty" class="card" style="text-align:center;color:#94a3b8;padding:50px;font-size:14px">
+      <div style="font-size:40px;margin-bottom:12px">📋</div>
+      <div style="font-weight:600;margin-bottom:8px">업로드된 승인문서가 없습니다</div>
+      <div style="font-size:13px">PDF를 업로드하면 다음 방문 시에도 유지됩니다.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 저장 다이얼로그 -->
+<div id="saveDlg" class="modal-bg hidden">
+  <div class="modal" style="width:380px">
+    <div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:16px">💾 템플릿 저장</div>
+    <input id="tplNameInput" placeholder="템플릿 이름 입력" style="width:100%;padding:9px 12px;border:1.5px solid #94a3b8;border-radius:7px;font-size:13px;outline:none;margin-bottom:16px" onkeydown="if(event.key==='Enter')saveTpl()"/>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn" onclick="closeSaveDlg()">취소</button>
+      <button class="btn btn-primary" onclick="saveTpl()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 불러오기 다이얼로그 -->
+<div id="loadDlg" class="modal-bg hidden">
+  <div class="modal" style="width:480px;max-height:70vh;display:flex;flex-direction:column">
+    <div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-bottom:16px">📂 템플릿 불러오기</div>
+    <div id="tplList" style="overflow-y:auto;flex:1"></div>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end">
+      <button class="btn" onclick="closeLoadDlg()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const {
-  useState,
-  useEffect,
-  useRef,
-  useMemo
-} = React;
-const XLSX = window.XLSX;
-const ls = {
-  get(k) {
-    try {
-      const v = localStorage.getItem(k);
-      return v ? JSON.parse(v) : [];
-    } catch {
-      return [];
-    }
-  },
-  set(k, v) {
-    try {
-      localStorage.setItem(k, JSON.stringify(v));
-    } catch {}
-  }
-};
+/* ── 상수 ── */
 const LOGO_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABiAJEDASIAAhEBAxEB/8QAHQAAAQQDAQEAAAAAAAAAAAAAAAUGBwgBAgMECf/EAEIQAAEDAwMCAgYGBwUJAAAAAAECAwQABREGByESMUFRCBMyYXGRFCI3gaGxFSNCYnWysyc1csHwNDZDUlNzdMLR/8QAGwEAAgMBAQEAAAAAAAAAAAAAAAUDBAYCAQf/xAAwEQACAgECAwYEBgMAAAAAAAABAgADEQQSBSExBhMiM0GBI1FhcRQVFjJSkTRCsf/aAAwDAQACEQMRAD8AuSawcdqFEgcCo09I/Ud60ptwu82CWYc5MthsO+rSv6qlEKGFAivaqmtdax1MjusFaFz0EkonBxxWrjzTSCp1aUJHcqOBVDrrutuFd1Yf1ZcgVdhGWGQfuRjNJn6O1teFl0wNRTVK5K1NPHq9+TT5eAsBm2wCKG4uOiIZe+TqjTUdXTI1BamFDwcmNpP4mkyRuJoRhRDmrbR1DviSk/lVCrnClw5Ko9xiPx5Ce7byClQ+dcOlGBhKflVxOzSMM95kfaVW4668gkvgrdnbhJ6Tq+25/wAZ/wDldGt0tu3+G9XWs/F3H5iqF4HkKOkeQ+Vd/pmn+R/qcDj1v8RPoHF1xoyQjLOq7Moe+YhP5kUsw7tbJv8Asdxiyf8AtPJX+Rr5xdCD3Qn5V1acdZP6p91s/uLIqM9ml9LMe0kHHj/sk+kXUD2xWwPFfPa06z1daUpTbdS3WMgHIQiWvp+WcU8rPv1uVb8Jcu0eelI4EmMk/wAuCfnVS3s7qF/YwMspxuk/uGJdfI8xzWUkedQnspvc1rSYuz3yHHt1zS0XUrbc/VPJT3xn2SPHk0+rVudoC43ZNrhartb01auhLQdwVEeAJ4NKLdJfUxVl6RnXqqrACGjzorTrGcAgmj1g/wCZPfHeq8sTeitPWDPccd6yFpIyCCKMwm1FGR50UQmh5NRJ6VSEubXtIcR1oVeISVJ8wXcEH51Lfh78VFHpT/Zix/GoP9UVPpCVvTHWVtVg0ODHvZNH6YsiAm2WC2RzjGW46QfnjNLfT0JwkYGOw4rolJzWFg847VA7M2SefvJa0UAYEpr6Wf2uu85xBayfnUS47e/t76tZurszedf7pLuyp0a3WlMZpv1pHW6sjOelPb7z8qcOm9gdvLU2kSra/dXU+05LeKuo/wCEYA+6tdRxmjT6dFPMgDpM7bw2++5mGAJTLwz4UeOKvS5s/tmttSRo21tlXdSGyk/PNMHXHo26elxHHtKS3rbLAJSy84XGV+7nlPx5qWrtFp3IDKRIrOD3ouVIMqpRXuvtpnWO7y7Rc46o8uK4ULbPu8R7q8NPkYOoYdDFDLtOD1hWMkY99ZoT344Phnzrr1nDdJLW120V51LpS6XyNPiMuOxi3AQh8FSnMg/XKfY4BGD3zzxTetm0O48u8otqNLToSw5gSXkhLLeD7fX2I8sVz2jvmrrHMu7+kEvOPfo9xbzaUlQCQRlfT5pzkUmWzWusWL41cYGo7m/c1ugpBkqX6459nozgg9uBSQ/ixY4DL7xqp04WvcDmTrv/AGTdSRcbO1pxVzmWtiG20RAUeovAYUpYGCc4GM0vXWz70O7TWONa7kE6jbczNC30oeU1+wCs8dQ4z50k727v6u0bcrTb4FtjxlvwmpL8iS0VBa1D6yE84GDx99LN53c1Hb9qrDqxrSLr8q4qKHmiFhtrHZQAHVhXhxSArqO7r8K+scqad7+Ix4PaX1RedMWBi6aql267QVtuTnoPSEyVj2knIHFPdKFBAzx5+Z9/upjN6g1zdLJpq52bT8FozihVyYnOlC4yD3KR4/64p+pSrHIA7eOfjSq3eCN2OvpGFAXGRn3nTIorbFFcZliaHx+FRR6U4/sxY/jUH+qKlc+NRR6U/wBmUf8AjUH+qKm0vnrK2p8lpLCe1auHB8zWw4FMndfWUrR9qQ7b7Bcb5PkZSwxFjrWkEeK1JB6R+dQqpdgokrNsXMeQUgEnI7ZOeMU09Sbk6J064pm76jgsOp9ptCi4tPxSgEj76qDrzdPXOqnnmbjdHoMXrKDBjZZSjHBSoDkke80xhjqJAANaPTdnWswbWwIhv42ASK1959ENMX616ktbN3s0tMqC8MtugEdX3HmlVRwkkDJx2qMfRhT/AGOWk5PdfHh3qT8cE5rPaitarGRegMeU2F61Y+sqz6ZVjZiXmzX1lCW1Sm1x3iB7ZTykn4Diq/jkVZz02QBatNjGR9Id/kqsaeE1ueCMW0ikzJcUQJqCBCseBHgfu++ij4c/67U3i45xyk07Lbr2nSOmLnBlachJksxy6y/HBSqWscBLuck9+4PbPFIlp3kusHU36ae0xpco6+pTbFvQhwDPPS4Oc0v7F6T0nFsd01xqu8QZsKJFUh2Azlamgrj9ZkA57AY86b2n7rs01qhl+RpfUDdvQ+FJ9fOS40gZGCpAGSn93NZwppzbZtQtHCm3YmXAk8bobs6JsBt0O72Ry7ypUduWhlbCFhltYyCSvse/HupbmbuaJteirbqZ2TIRbp6vVx2UMfrAUj6wKOAAB3pJ3Z05tNe1W646vuMe3OlpCI7rUr1Knmv2QRzlIzxxxS+/pTb13RECzzYdqcsEYBUNTrv1Mn2VBeRlR8eeazjLR3aeFvWOw1pZ/EPSemZuHZGoen7hFYuU2LfVpTGdjRSsAHsV59kU821FSeqkZiVp+wxbdbmpMG3x3AGYbXrEoSrjgIBPP3UtcHB9+cA/jVN1XBAGJaTJIJOZ0orNFRbfrJszU1E/pT/ZlH/jMH+qKlion9Kf7MmP41B/qirel89ZW1XktJYBrRwBeM54PnWaxnjFVc4xmTnmCJ87NVf71Xnkk/pGRknx/WqpOHelbWbJY1le2ic4uD5+bij/AJ0k19O0vlLj5TB3+YfvLs+jD9jdp+K/5qk4+zUYejCcbN2nPmv86k4Zwc1861nn2febbS8qkErr6bX916b/APJd/kqsY9mrOemz/dOm/P6S7/JVYx7NbXgQP4RZl+L/AOSZgVkZKk4GT2HjWBRjPABpyM55RZ6GSBsZpt3VGopttWt1mzrguJuUlJ6Uto7pJPbPUAQD3ANe7T+32i52rG7TK3RtDkUvBISyw4FuDPCUrUOnJ8ea9m1morrqTTVx2pQIscXSMpMCS20lshxOFdCyOVAgHnuPOkaHszuTJvCbWvTb8TC+lUtawllP7wXnnjnzNILLWFzq9nd/Qf8AY1RF2IUXf9ZOG7+xz2tLvDuVovTMFTEVqIpqS2VoDaOxTjxI70qXXZCBdNubLpBzUE9k2tZc+koT1BxSvaygngeXPFM/fzTe6MiZZ2tPG5zLVFhNMBMJwpUH0jClrA5IPGCfDNOO62PeZ3amwQbVdkNagbUfp5U+kOKbx9UFZ4JHj50g3WGmv4wxkxwq1h3+GZIFt0Bptmx2O2ToKboLKlP0N+Ty4lSf2vjTtSEhPSMADw93lTETpPUF2tOmnL5qmbDulrKXJn0IpDcpeOUq47U+kY7ckj6ufE/GllhySc5jCsYAGMTtzRRiio+clmlRR6U/2YsfxqD/AFRUsVDvpduer2feX1FJTcYxBB7HqNWNJk3pj5yDVcqWkrT58KCOuZMYjpx/xHAn8zTXl7m7fQ3SmRq+zpWk4KBJSpWfLAqjhavl/k9Raud2ePYqS48fxzS9b9sdwbgQI+kLrz29ayWh81YFPvyKlB8S4RT+bXMfAnKIeqpjVw1PdpzCgpl+a8ttYz9ZJWcH5UmGpPhbD7myE5XZWYxP/VlN/wCRNKTHo47hr9tyyNkjsuUrP4INPF12kqUDvBy+sTnSaixiSkeuyO8GidKbc26yXmbKbmMFXrEJjLWOTnuBT3HpC7aZAVc5gHn9Dc4/Cofb9GrXKkku3KypJ8EuuH/1FcnfRt18leG5tjWnwUZCx+HRSO3TcLtdmZ+sbJfrkUKF5Cev0n9f6X1tarENOXH6WqO+4p0KaU2Ugpx2UBUG1Lkv0edx2eW2ba/7m5eCfmBSHP2Z3MhpJXpd91A8WnW3PwSomnGiu0enrFSWA+8W6urUXWF2WR/QPDAyc470s3bSmqbSFG5acukRIHtORVgflSKs9CsOJ6OP2hj86Zrajcww/uUTW69VkxbSRbTZdD6g1nYrn+kdWwIZ9TCLBH0MKIClhJ9s48R2pl2vcnX0a8t3SNqe5ypZWMNrdK0uk9kdHiD5UqbNKudglzddpgPu2u0Rll1WCEPlQ6Q1nseSCR5V3sW7Dtr1Wm/O6Q0yWkOFa22IAQ4gHuUL79QpEa232Ns7z3jEWeFAW2SVd8d3tYaQm2mBa4EeH9IhNSXX32SsKcUPrISDxxznypXuu7WqYO1lj1XH0cuTOuJKXkhK/VIx2V0gdWFeFe3c7d/R+m3rfAuNjdvEqRHRM9SppCksIWMg5V4n3DwpZnbu6Mt2i7bqmRIkNwbjlthhtkqcBA+sOkcDFIGXFafB5fP5x0jZdh3vM+k9rd31xerPpi62S226CmYUu3WNOUQ6y2Rz09ufjT6SDjnxx27Zpmydf2xMCwXC32y53WLfHEoYfix+oNgj2nPIU80knJ5GcHHbHxpc6nJBGBLyFeRzkztg+dFZz7qKj2yfdNfKvBcrbCuTJjXGCxMYKwr1chsOJBHY4IxSjRXvrmGAes8cKFFiMpZixmo7aeyG2wlPyFegJyO2K6UUEk9ZyqKvQTTpNHSfOt6K82id5mnSfOjpPnW9FG0fKGTNMe6gJreigDE8nFSAcjB+NJFw0vp6e6HZtgtklxJ6gp2I2o/Mg0u0V0rFehnJRT1ESJditcqyO2d63MG3utltccNhLZT5ADsKjO2ejxt/Bu6bgWZ8hpC+tuI8/wBTSTnOCMZI9x86mOipK77awQjEZkb6ep8blBxGBrvavR2tZMeTe7c6JEdIbQ5GcLSugdkEjuBSi/t/pCRpqLp2Vp+JItkTliO4kkIPnnvk+NO6ivDbYVC7jgT0Upu3YGftE+2QY9thNQYMZEeMykIbbQnCUDyAr2hOK3oqM8+skAwMCFFFFGJ7CiiiiEKKKKIQoooohCiiiiEKKKKIQoooohCiiiiEKKKKIQoooohCiiiiE//Z";
 const SIGN_B64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCABJAI4DASIAAhEBAxEB/8QAHAABAAEFAQEAAAAAAAAAAAAAAAUCAwQGBwEI/8QAOhAAAQIFAgQDBQYEBwAAAAAAAQIDAAQFBhESIQcxQVETImEycXKBsQgUFTOR8BZSocFCQ2RzkrLC/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/APsuEIQCEIQCEIQCEYlSem2ZdTkmw284kElC3NO3TfftHO7n4h3PQkS738KNVIPqKPu0o86XmiASSrLeCNj2gOnwjiEpxR4m1hqZapHDh1LwBCHHkrSlJ6bKAz/SLPh/aJmGm5ht6RaUtOotL8BOk9BjB+cB3WEfOD3GTiJZ9wNU6+qHIrSrQXGmyEOhJwNaCklKskHb5bR9EycwJmVZmNCmw6hKwlexGRnBHeAvQhCAQhCAQhCAQhCAQhCAQIyCO8IE4BPaAEZjwjPUg4xtFDrraGlrdUEITnWpSgAkdyekaHc/FmyKIhxKqs1NrScaJfJBPbVjBOex5mA38kaSQods+sc74x8Ql2nQtNFaTOVmdWlmTQlGvdXXSN1Y7fsxlJn7xvzE6JZVvUXxAtuZmlEOOJH8jXL3KUe+xiYEzYNpzLlQqNZlnqkE5dnZ1fiO7DISDjCB6DHKA0Dg7wkrL1wG9+JRM3UXVh1qTmCFlLh5KX02zsnOB2ztHfiN8jY945bU+PPDuUWQ1UJucV/p5cqBwM9ff9IlrG4r2hd9YFHpMxMNzykFxtp9rT4oA3wd8kDc+6A32EW3X2mkhTq0tpPVagnpnrEXUbpt6np1TlXk2jkJwXQTk8htATEI1Ob4jWZLpz+OMPHSVhLIKyQOZ2GIyqDeVFrhZFPMysvJ1I1slGR84DYoRDmqzCqwuQbo86tpCQfvOwTkkdFH94iWbWVE5QpOO8BVCEIBCB26ZjzVzODgekB7HivZOTp259oxqhPyUlKLmZ2bZlWUpJLjqwlIHfOY5Nd/HWhUp/waDTV1k5CUPJdCGySCRjYqI59oDP8AtC2xeV1USRk7YmElhC1qnZZEx4SnuQSAeWBk5z6RoHDvhrfVAmvvE3QLdacI0pn6lNeIpnPRCRkA7DfGYzUX7xmu0LZodrqpzSxqS6GCnSNsedwgZOe3TvyqleD3EK4ENquy7g2hQ1KSl1broV68gf1gNouSpW/MSSZC6uIaUCXb8R6VpT5bL3MY1DJI22AxGkVW6+E8swhqnWZNV55shSX59xXmPQkqJJ92Mbfp0WhcE7Rkmyakh+rPHG7yyhKe5SE4jdKLa1vUYI/DaHISpSNOtDQK8fEd+8B8w3nxFmGpJxii2RbtJdmE+EkIk0OPYOwKcj122+UZ/Cvg5xCXNNXHOVI24+9nBI1PlCgdWUjkTk+XY7nOOUdP4u8G5S9Kj+OSVVVTav4SUHUklpwJ9kbHKOfMZ3jmlSvnijwwqzFMrVYpldZCCUNOvB1WkHbUR50ntnPLpAdNl+EL0wXDcV4TtRyhQSEt6AAc55qV36RPyfCyyZUIU5TVzBQ2GyXnVHXuCMgYyc9u+InrMrabitanV5EsZdE4wl7w1c0HJz/feJuAipe2relwAxRae3j+WXSP7RJobbb9htCdsbDEVQgPNIxjHlxjGNo9hCAR4s6U5zj5QUcDIGT0jkP2k76rtp0OTkbdU4zUJ9R1TCUJWpttPPSDnzHvjYQG83nfNs2nKqcrVWlmXhuiWS4PGc2yAE5yD79o0ag8Q7svpbxtOhIkJNtY1TUwpK3EgjY6fZzz2+sc04YcF6zeU4m6r6qjyZWYw6W1Oa5qbHTWr/CCNsc/QR9NU2RptLl0StPlpSUZTjCWkpSMAYGe5x1/ZDmbnCB+u1ZM9eV0VCrISQkMBZSggb4wMBPb5RvdvWRadvtBuk0GSl8Y8xRrUT3yrJz6xLv1GQYSVPTsu2kY3W4AMHkfdEVO3nako6WZmvyCHEgKKQ8FHBOAfLmAnsHHM84aRt6cjneNSbvumPLUmnyFZntJ0jwpNWlXbBPPvn1jKbq1dm2yZa23mUEeT7w8lBGOWUnlv+9oDZCQASTgCIGt3bRKOMzc1qJyAlpOonHryjHNNuae2nKjLSaNWcMpLhPcb4GPQ5/pvckrPozDyZiblzUZhGCHJnCgD3CfZH6QHM7pr993vUUyNiPmVpgUA9NNoU2rONwtwjH/AB7YjKszgTb1NmWZ+5Ztyu1AKC9BylkKzvtnzjOc6v0jsTaA2hKEIQhI2CU7AD0iqAttstNtJabbShCE6UhIACQNgBjkANouQhAIQhAIQhACMgjvEDeFoW/dkomWrtPbmUt58JYJStonmUqByDsInoomPyHPhP0gOVo4G28zlMlXK6wgHIR961AHn1Hr84zEcHKCXUqmaxWZjllKpgAKAxz2/fWOkP8AsD4k/URXAaCzwistCtTstOTBzlXizSiFHqSBjny7YjYKZZlqU15T0lb9OadUnSV+CFKx2yc7RPQgKENpSAE7AAAAbDb3e4RVjzFXcYj2KJf8hv4R9ICuEUMewfiV9TFtH5ct8v8AqYC/CEWHv8//AGh/6gL8IQgEIol/yG/hH0iuAQihv23fi/sIS/5Dfwj6QH//2Q==";
+const MAX_E = 3;
+const WFIELDS = [
+  {k:"date",  lb:"날짜",         tp:"date", w:130},
+  {k:"desc",  lb:"용접내용",     w:200, hk:"desc"},
+  {k:"procNo",lb:"공정번호",     w:105, hk:"procNo"},
+  {k:"welder",lb:"용접사/ID",    w:130, hk:"welder"},
+  {k:"method",lb:"용접방법",     w:105, hk:"method", pre:["FCAW","SMAW","GTAW","SAW","GMAW","EGW"]},
+  {k:"wps",   lb:"WPS NO.",      w:160, hk:"wps"},
+  {k:"part",  lb:"부품명",       w:115, hk:"part"},
+  {k:"mat",   lb:"재질",         w:175, hk:"mat"},
+  {k:"aws",   lb:"AWS No.",      w:115, hk:"aws"},
+  {k:"heat",  lb:"Heat/Lot No.", w:135, hk:"heat"},
+  {k:"sz",    lb:"Size",         w:90,  hk:"sz"},
+  {k:"rmk",   lb:"비고",         w:150, hk:"rmk"},
+];
+const HKEYS = ["docNo","cust","proj","prod","drwNo","desc","procNo","welder","method","wps","part","mat","aws","heat","sz","rmk"];
+const TABS  = ["📋 기본정보","📦 제품번호","🔧 작업내역","📄 승인문서"];
+const FIELDS_META = {
+  docNo: {lb:"문서번호", ph:"예) WR-NCD230801"},
+  cust:  {lb:"고객",    ph:"예) KHNP"},
+  proj:  {lb:"공사명",  ph:"예) SAEUL #3,4 M254"},
+  prod:  {lb:"제품명",  ph:"예) Control Damper"},
+  drwNo: {lb:"도면번호",ph:"예) M254-DG-A02-05 Rev.3"},
+};
+
+/* ── 상태 ── */
+const state = {
+  form: {docNo:"",cust:"",proj:"",prod:"",drwNo:"",pNos:[]},
+  entries: [mkE(),mkE(),mkE()],
+  hist: {},
+  tpls: [],
+  pdfList: [],
+  selPdf: null,
+  selPdfName: "",
+  activeTab: 0,
+};
+
+function mkE() {
+  return {date:"",desc:"",procNo:"",welder:"",method:"",wps:"",part:"",mat:"",aws:"",heat:"",sz:"",rmk:""};
+}
+
+/* ── localStorage ── */
+const ls = {
+  get(k) { try { const v=localStorage.getItem(k); return v?JSON.parse(v):[]; } catch { return []; } },
+  set(k,v) { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
+};
+
+/* ── 초기화 ── */
+function init() {
+  // 탭 버튼
+  const bar = document.getElementById("tabBar");
+  TABS.forEach((t,i) => {
+    const btn = document.createElement("button");
+    btn.textContent = t;
+    btn.style.cssText = "padding:12px 18px;font-size:13px;font-weight:600;cursor:pointer;border:none;background:none;color:#7fa8c9;border-bottom:3px solid transparent;transition:color .15s";
+    btn.onclick = () => switchTab(i);
+    btn.id = "tabBtn"+i;
+    bar.appendChild(btn);
+  });
+  switchTab(0);
+
+  // 이력 로드
+  HKEYS.forEach(k => { state.hist[k] = ls.get("wr:"+k); });
+  state.tpls = ls.get("wr:tpls");
+
+  // 기본정보 필드 생성
+  Object.entries(FIELDS_META).forEach(([k,m]) => {
+    const wrap = document.getElementById("fw-"+k);
+    if (!wrap) return;
+    wrap.innerHTML = "";
+    createAutoIn(wrap, k, m.lb, m.ph, v => {
+      state.form[k] = v;
+    });
+  });
+
+  // 작업내역 테이블 헤더
+  const head = document.getElementById("entryHead");
+  const tr = document.createElement("tr");
+  const th0 = document.createElement("th"); th0.textContent="순번"; th0.style.width="50px"; tr.appendChild(th0);
+  WFIELDS.forEach(f => {
+    const th = document.createElement("th");
+    th.textContent = f.lb; th.style.minWidth = f.w+"px"; th.style.width = f.w+"px";
+    tr.appendChild(th);
+  });
+  const thd = document.createElement("th"); thd.textContent="삭제"; thd.style.width="50px"; tr.appendChild(thd);
+  head.appendChild(tr);
+  renderRows();
+
+  // 드래그앤드롭
+  setupDragZone("dropZone", file => importExcel(file));
+  setupDragZone("pdfDropZone", file => uploadPdf(file));
+
+  // PDF 목록 로드
+  state.pdfList = ls.get("wr:pdfList");
+  if (state.pdfList.length) {
+    renderPdfBtns();
+    const b64 = localStorage.getItem("wr:pdf:"+state.pdfList[0].name);
+    if (b64) { state.selPdf = b64; state.selPdfName = state.pdfList[0].name; renderPdfViewer(); }
+  }
+  updatePdfEmpty();
+}
+
+/* ── 탭 전환 ── */
+function switchTab(i) {
+  document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+  document.getElementById("tab"+i).classList.add("active");
+  document.querySelectorAll("#tabBar button").forEach((btn,j) => {
+    btn.style.color = j===i ? "#fff" : "#7fa8c9";
+    btn.style.borderBottom = j===i ? "3px solid #3b82f6" : "3px solid transparent";
+  });
+  state.activeTab = i;
+}
+
+/* ── 자동완성 입력 ── */
+function createAutoIn(wrap, key, label, placeholder, onChange) {
+  const lbl = document.createElement("div");
+  lbl.className = "field-label"; lbl.textContent = label;
+  const inp = document.createElement("input");
+  inp.className = "field-input"; inp.placeholder = placeholder || "";
+  inp.value = state.form[key] || "";
+  const dd = document.createElement("div"); dd.className = "dropdown";
+
+  function showDd(filter) {
+    const hist = state.hist[key] || [];
+    const items = filter ? hist.filter(x => x.toLowerCase().includes(filter.toLowerCase())) : hist;
+    if (!items.length) { dd.classList.remove("open"); return; }
+    dd.innerHTML = "";
+    const hdr = document.createElement("div");
+    hdr.className = "dropdown-header"; hdr.textContent = "이력 "+hist.length+"개";
+    dd.appendChild(hdr);
+    items.slice(0,12).forEach(x => {
+      const row = document.createElement("div"); row.className = "dropdown-item";
+      const span = document.createElement("span"); span.textContent = x; span.style.flex="1";
+      const del = document.createElement("span"); del.className = "dropdown-del"; del.textContent = "✕";
+      del.onmousedown = e => {
+        e.preventDefault(); e.stopPropagation();
+        state.hist[key] = (state.hist[key]||[]).filter(h => h!==x);
+        ls.set("wr:"+key, state.hist[key]);
+        showDd(inp.value);
+      };
+      row.onmousedown = e => {
+        e.preventDefault();
+        inp.value = x; onChange(x); saveHist(key,x);
+        dd.classList.remove("open");
+      };
+      row.appendChild(span); row.appendChild(del); dd.appendChild(row);
+    });
+    const rect = inp.getBoundingClientRect();
+    dd.style.top = (rect.bottom+2)+"px";
+    dd.style.left = rect.left+"px";
+    dd.style.width = Math.max(rect.width,220)+"px";
+    dd.classList.add("open");
+  }
+
+  inp.addEventListener("input", e => { onChange(e.target.value); showDd(e.target.value); });
+  inp.addEventListener("focus", () => showDd(""));
+  inp.addEventListener("blur", () => {
+    setTimeout(()=>dd.classList.remove("open"),150);
+    saveHist(key, inp.value);
+  });
+
+  wrap.appendChild(lbl); wrap.appendChild(inp); document.body.appendChild(dd);
+}
+
+function saveHist(key, val) {
+  if (!val || !val.trim()) return;
+  const arr = state.hist[key] || [];
+  const next = [val, ...arr.filter(x=>x!==val)].slice(0,20);
+  state.hist[key] = next;
+  ls.set("wr:"+key, next);
+}
+
+/* ── 작업내역 ── */
+function renderRows() {
+  const tbody = document.getElementById("entryBody");
+  tbody.innerHTML = "";
+  state.entries.forEach((en,i) => {
+    const tr = document.createElement("tr");
+    const numTd = document.createElement("td");
+    numTd.className = "tbl-num"; numTd.textContent = i+1; tr.appendChild(numTd);
+
+    WFIELDS.forEach(f => {
+      const td = document.createElement("td");
+      td.style.minWidth = f.w+"px"; td.style.width = f.w+"px";
+      if (f.tp === "date") {
+        const inp = document.createElement("input");
+        inp.type = "date"; inp.value = en[f.k] || "";
+        inp.onchange = e => { state.entries[i][f.k] = e.target.value; };
+        td.appendChild(inp);
+      } else {
+        // 자동완성 인풋
+        const inp = document.createElement("input");
+        inp.className = "field-input";
+        inp.style.cssText = "border:none;border-radius:0";
+        inp.value = en[f.k] || "";
+        const hk = f.hk || f.k;
+        const pre = f.pre || [];
+        const dd = document.createElement("div"); dd.className = "dropdown";
+
+        function showDd2(filter) {
+          const hist = state.hist[hk] || [];
+          const all = [...new Set([...pre, ...hist])];
+          const items = filter ? all.filter(x=>x.toLowerCase().includes(filter.toLowerCase())) : all;
+          if (!items.length) { dd.classList.remove("open"); return; }
+          dd.innerHTML = "";
+          if (hist.length) {
+            const hdr = document.createElement("div");
+            hdr.className = "dropdown-header"; hdr.textContent = "이력 "+hist.length+"개"; dd.appendChild(hdr);
+          }
+          items.slice(0,12).forEach(x => {
+            const row = document.createElement("div"); row.className = "dropdown-item";
+            const span = document.createElement("span"); span.textContent = x; span.style.flex="1";
+            const isPre = pre.includes(x);
+            if (!isPre) {
+              const del = document.createElement("span"); del.className = "dropdown-del"; del.textContent = "✕";
+              del.onmousedown = e2 => {
+                e2.preventDefault(); e2.stopPropagation();
+                state.hist[hk] = (state.hist[hk]||[]).filter(h=>h!==x);
+                ls.set("wr:"+hk, state.hist[hk]); showDd2(inp.value);
+              };
+              row.appendChild(span); row.appendChild(del);
+            } else { row.appendChild(span); }
+            row.onmousedown = e2 => {
+              e2.preventDefault(); inp.value = x;
+              state.entries[i][f.k] = x; saveHist(hk,x);
+              dd.classList.remove("open");
+            };
+            dd.appendChild(row);
+          });
+          const rect = inp.getBoundingClientRect();
+          dd.style.top=(rect.bottom+2)+"px"; dd.style.left=rect.left+"px";
+          dd.style.width=Math.max(rect.width,220)+"px"; dd.classList.add("open");
+        }
+        inp.addEventListener("input", e => { state.entries[i][f.k]=e.target.value; showDd2(e.target.value); });
+        inp.addEventListener("focus", () => showDd2(""));
+        inp.addEventListener("blur", () => { setTimeout(()=>dd.classList.remove("open"),150); saveHist(hk,inp.value); });
+        td.appendChild(inp); document.body.appendChild(dd);
+      }
+      tr.appendChild(td);
+    });
+
+    const delTd = document.createElement("td");
+    delTd.style.textAlign="center";
+    const delBtn = document.createElement("button");
+    delBtn.textContent="✕"; delBtn.style.cssText="background:none;border:none;color:#e74c3c;font-size:18px;font-weight:700;cursor:pointer";
+    delBtn.onclick = () => {
+      if (state.entries.length > 1) state.entries.splice(i,1);
+      else state.entries[0] = mkE();
+      renderRows(); updateEntryTitle();
+    };
+    delTd.appendChild(delBtn); tr.appendChild(delTd);
+    tbody.appendChild(tr);
+  });
+  updateEntryTitle();
+}
+
+function addRow() {
+  if (state.entries.length >= MAX_E) return;
+  state.entries.push(mkE()); renderRows(); updateEntryTitle();
+}
+function updateEntryTitle() {
+  document.getElementById("entryTitle").textContent = `작업 내역 (${state.entries.length} / ${MAX_E}행)`;
+  document.getElementById("btnAddRow").disabled = state.entries.length >= MAX_E;
+}
+
+/* ── 제품번호 ── */
+function setupDragZone(id, onDrop) {
+  const el = document.getElementById(id);
+  el.addEventListener("dragover", e => { e.preventDefault(); el.classList.add("over"); });
+  el.addEventListener("dragleave", () => el.classList.remove("over"));
+  el.addEventListener("drop", e => { e.preventDefault(); el.classList.remove("over"); onDrop(e.dataTransfer.files[0]); });
+}
+
+function addProducts() {
+  const txt = document.getElementById("pInput").value;
+  const nos = txt.split(/[\n,，、]/).map(s=>s.trim()).filter(Boolean);
+  if (!nos.length) return;
+  state.form.pNos = [...new Set([...state.form.pNos, ...nos])];
+  document.getElementById("pInput").value = "";
+  renderProducts();
+}
+function clearProducts() { state.form.pNos = []; renderProducts(); }
+function renderProducts() {
+  const list = document.getElementById("productList");
+  const badge = document.getElementById("qtyBadge");
+  badge.textContent = state.form.pNos.length ? "수량: "+state.form.pNos.length+" Sets" : "수량: -";
+  if (!state.form.pNos.length) {
+    list.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:28px 0;font-size:13px;width:100%">등록된 제품번호가 없습니다.</div>';
+    return;
+  }
+  list.innerHTML = "";
+  state.form.pNos.forEach((n,i) => {
+    const pill = document.createElement("div"); pill.className="pill";
+    const span = document.createElement("span"); span.textContent = n;
+    const btn = document.createElement("button");
+    btn.textContent="✕"; btn.style.cssText="background:none;border:none;color:#e74c3c;font-size:13px;cursor:pointer";
+    btn.onclick = () => { state.form.pNos.splice(i,1); renderProducts(); };
+    pill.appendChild(span); pill.appendChild(btn); list.appendChild(pill);
+  });
+}
+
+function importExcel(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    loadXLSXLib(() => {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1,raw:false});
+      const nos = [];
+      rows.forEach(r => (r||[]).forEach(c => { const s=String(c||"").trim(); if(s) nos.push(s); }));
+      state.form.pNos = nos;
+      renderProducts();
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadXLSXLib(cb) {
+  if (window.XLSX) { cb(); return; }
+  const s = document.createElement("script");
+  s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+  s.onload = cb; document.head.appendChild(s);
+}
+
+/* ── 템플릿 ── */
+function openSaveDlg() { document.getElementById("saveDlg").classList.remove("hidden"); document.getElementById("tplNameInput").focus(); }
+function closeSaveDlg() { document.getElementById("saveDlg").classList.add("hidden"); document.getElementById("tplNameInput").value=""; }
+function saveTpl() {
+  const name = document.getElementById("tplNameInput").value.trim();
+  if (!name) return;
+  const tpl = {name, date: new Date().toLocaleDateString("ko-KR"), entries: state.entries.map(e=>({...e}))};
+  state.tpls = [tpl, ...state.tpls.filter(t=>t.name!==name)].slice(0,30);
+  ls.set("wr:tpls", state.tpls);
+  closeSaveDlg();
+}
+function openLoadDlg() {
+  const list = document.getElementById("tplList");
+  list.innerHTML = "";
+  if (!state.tpls.length) { list.innerHTML='<div style="text-align:center;color:#94a3b8;padding:30px;font-size:14px">저장된 템플릿이 없습니다.</div>'; }
+  state.tpls.forEach(t => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;border:1px solid #e2e8f0;margin-bottom:8px;background:#f8fafc";
+    row.innerHTML = `<div style="flex:1"><div style="font-size:14px;font-weight:700;color:#1a3a5c">${t.name}</div><div style="font-size:12px;color:#64748b;margin-top:2px">${t.date} · ${t.entries.length}행</div></div>`;
+    const loadBtn = document.createElement("button"); loadBtn.className="btn btn-primary"; loadBtn.style.fontSize="13px"; loadBtn.textContent="불러오기";
+    loadBtn.onclick = () => { state.entries = t.entries.map(e=>({...e})); renderRows(); closeLoadDlg(); };
+    const delBtn = document.createElement("button"); delBtn.className="btn"; delBtn.style.cssText="border-color:#fca5a5;background:#fff5f5;color:#e74c3c;font-size:12px"; delBtn.textContent="삭제";
+    delBtn.onclick = () => { state.tpls = state.tpls.filter(x=>x.name!==t.name); ls.set("wr:tpls",state.tpls); openLoadDlg(); };
+    row.appendChild(loadBtn); row.appendChild(delBtn); list.appendChild(row);
+  });
+  document.getElementById("loadDlg").classList.remove("hidden");
+}
+function closeLoadDlg() { document.getElementById("loadDlg").classList.add("hidden"); }
+
+/* ── PDF ── */
+function uploadPdf(file) {
+  if (!file || file.type!=="application/pdf") { alert("PDF 파일만 가능합니다"); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const bytes = new Uint8Array(ev.target.result);
+    let bin="";
+    for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
+    const b64 = btoa(bin);
+    try { localStorage.setItem("wr:pdf:"+file.name, b64); }
+    catch(e) { alert("저장 용량 초과. 파일이 너무 큽니다."); return; }
+    state.pdfList = [{name:file.name}, ...state.pdfList.filter(p=>p.name!==file.name)].slice(0,5);
+    ls.set("wr:pdfList", state.pdfList);
+    state.selPdf = b64; state.selPdfName = file.name;
+    renderPdfBtns(); renderPdfViewer(); updatePdfEmpty();
+  };
+  reader.readAsArrayBuffer(file);
+}
+function renderPdfBtns() {
+  const wrap = document.getElementById("pdfBtnList"); wrap.innerHTML="";
+  state.pdfList.forEach(p => {
+    const div = document.createElement("div"); div.style.display="flex";div.style.alignItems="center";div.style.gap="6px";
+    const btn = document.createElement("button"); btn.className="btn";
+    btn.style.cssText = (state.selPdfName===p.name ? "border:2px solid #3b82f6;background:#eff6ff;color:#1d4ed8;" : "border-color:#e2e8f0;") + "font-size:13px;font-weight:600";
+    btn.textContent = "📄 "+p.name;
+    btn.onclick = () => {
+      const b64 = localStorage.getItem("wr:pdf:"+p.name);
+      if (!b64) { alert("PDF를 찾을 수 없습니다"); return; }
+      state.selPdf=b64; state.selPdfName=p.name;
+      renderPdfBtns(); renderPdfViewer();
+    };
+    const del = document.createElement("button"); del.style.cssText="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer"; del.textContent="✕";
+    del.onclick = () => {
+      localStorage.removeItem("wr:pdf:"+p.name);
+      state.pdfList = state.pdfList.filter(x=>x.name!==p.name);
+      ls.set("wr:pdfList",state.pdfList);
+      if(state.selPdfName===p.name){state.selPdf=null;state.selPdfName="";document.getElementById("pdfViewer").innerHTML="";}
+      renderPdfBtns(); updatePdfEmpty();
+    };
+    div.appendChild(btn); div.appendChild(del); wrap.appendChild(div);
+  });
+}
+function updatePdfEmpty() {
+  document.getElementById("pdfEmpty").style.display = state.pdfList.length ? "none" : "";
+}
+function renderPdfViewer() {
+  if (!state.selPdf) return;
+  const wrap = document.getElementById("pdfViewer");
+  wrap.innerHTML = '<div class="card" style="padding:40px;text-align:center;color:#64748b">⏳ PDF 렌더링 중...</div>';
+  const loadPdfJs = (cb) => {
+    if (window.pdfjsLib) { cb(window.pdfjsLib); return; }
+    const s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload=()=>{window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";cb(window.pdfjsLib);};
+    document.head.appendChild(s);
+  };
+  loadPdfJs(async lib => {
+    const bin=atob(state.selPdf); const arr=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    const pdf = await lib.getDocument({data:arr}).promise;
+    wrap.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><div id="pdfPages" style="background:#525659;padding:16px;display:flex;flex-direction:column;align-items:center;gap:8px;max-height:80vh;overflow-y:auto"></div></div>';
+    const pages = document.getElementById("pdfPages");
+    for(let i=1;i<=pdf.numPages;i++) {
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({scale:1.4});
+      const canvas=document.createElement("canvas");
+      canvas.width=vp.width;canvas.height=vp.height;canvas.style.boxShadow="0 2px 8px rgba(0,0,0,.4)";
+      pages.appendChild(canvas);
+      page.render({canvasContext:canvas.getContext("2d"),viewport:vp});
+    }
+  });
+}
+
+/* ── 엑셀 생성 ── */
+async function makeXlsx() {
+  const btn = document.getElementById("btnMakeXlsx");
+  btn.textContent="생성 중..."; btn.disabled=true;
+  try {
+    const form = {...state.form, entries: state.entries};
+    const b64 = await buildExcelB64(form);
+    const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const href = "data:"+mime+";base64,"+b64;
+    const name = "용접기록서_"+(state.form.docNo||"draft")+".xlsx";
+    const dlHtml = `<div class="dl-box"><div style="font-size:13px;color:#2e7d32;margin-bottom:10px;font-weight:700">✅ 파일 준비 완료!</div><a href="${href}" download="${name}" style="display:inline-flex;align-items:center;gap:8px;background:#27ae60;color:#fff;padding:12px 28px;border-radius:8px;font-size:15px;font-weight:700;text-decoration:none">📄 ${name} 저장</a></div>`;
+    document.getElementById("dlBox0").innerHTML = dlHtml;
+    document.getElementById("dlBox2").innerHTML = dlHtml;
+  } catch(e) { alert("생성 오류: "+e.message); }
+  finally { btn.textContent="📥 파일 생성"; btn.disabled=false; }
+}
+
+/* ── buildExcelB64 ── */
 async function buildExcelB64(form) {
   if (!window.ExcelJS) {
     await new Promise((res, rej) => {
@@ -545,1445 +1141,9 @@ async function buildExcelB64(form) {
   for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
   return btoa(bin);
 }
-function AutoIn({
-  lb,
-  v,
-  onChange,
-  h = [],
-  onSave,
-  onDelete,
-  ph = "",
-  style = {}
-}) {
-  const [open, setOpen] = useState(false);
-  const [flt, setFlt] = useState("");
-  const [pos, setPos] = useState({
-    top: 0,
-    left: 0,
-    width: 220
-  });
-  const inputRef = useRef();
-  const shown = useMemo(() => {
-    if (!h.length) return [];
-    const q = flt.toLowerCase().trim();
-    return (q ? h.filter(x => x.toLowerCase().includes(q)) : h).slice(0, 12);
-  }, [h, flt]);
-  const calcPos = () => {
-    if (inputRef.current) {
-      const r = inputRef.current.getBoundingClientRect();
-      setPos({
-        top: r.bottom + 2,
-        left: r.left,
-        width: Math.max(r.width, 220)
-      });
-    }
-  };
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "relative",
-      ...style
-    }
-  }, lb && /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      marginBottom: 4,
-      fontWeight: 600
-    }
-  }, lb), /*#__PURE__*/React.createElement("input", {
-    ref: inputRef,
-    value: v,
-    placeholder: ph,
-    style: {
-      width: "100%",
-      padding: "8px 10px",
-      border: "1.5px solid #cbd5e1",
-      borderRadius: 5,
-      fontSize: 13,
-      background: "#fff",
-      color: "#1e293b",
-      outline: "none",
-      boxSizing: "border-box"
-    },
-    onChange: e => {
-      onChange(e.target.value);
-      setFlt(e.target.value);
-      calcPos();
-      setOpen(true);
-    },
-    onFocus: () => {
-      calcPos();
-      setFlt("");
-      setOpen(h.length > 0);
-    },
-    onBlur: () => {
-      setTimeout(() => setOpen(false), 160);
-      onSave && onSave(v);
-    }
-  }), open && shown.length > 0 && /*#__PURE__*/React.createElement("ul", {
-    style: {
-      position: "fixed",
-      top: pos.top,
-      left: pos.left,
-      width: pos.width,
-      zIndex: 99999,
-      backgroundColor: "#fff",
-      border: "2px solid #3b82f6",
-      borderRadius: 7,
-      maxHeight: 280,
-      overflowY: "auto",
-      boxShadow: "0 8px 28px rgba(0,0,0,.35)",
-      padding: 0,
-      margin: 0
-    }
-  }, /*#__PURE__*/React.createElement("li", {
-    style: {
-      padding: "6px 14px",
-      fontSize: 11,
-      color: "#64748b",
-      backgroundColor: "#f8fafc",
-      borderBottom: "1px solid #e2e8f0",
-      listStyle: "none",
-      cursor: "default"
-    }
-  }, "\uC774\uB825 ", h.length, "\uAC1C"), shown.map((x, i) => /*#__PURE__*/React.createElement("li", {
-    key: i,
-    onMouseDown: e => {
-      e.preventDefault();
-      onChange(x);
-      setOpen(false);
-      onSave && onSave(x);
-    },
-    style: {
-      display: "flex",
-      alignItems: "center",
-      fontSize: 13,
-      cursor: "pointer",
-      backgroundColor: "#fff",
-      borderBottom: "1px solid #e2e8f0",
-      listStyle: "none"
-    },
-    onMouseEnter: e => e.currentTarget.style.backgroundColor = "#dbeafe",
-    onMouseLeave: e => e.currentTarget.style.backgroundColor = "#fff"
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
-      padding: "10px 8px 10px 14px",
-      color: "#111"
-    }
-  }, x), onDelete && /*#__PURE__*/React.createElement("span", {
-    onMouseDown: e => {
-      e.preventDefault();
-      e.stopPropagation();
-      onDelete(x);
-    },
-    style: {
-      padding: "10px 13px",
-      color: "#94a3b8",
-      fontSize: 13,
-      cursor: "pointer",
-      flexShrink: 0,
-      borderLeft: "1px solid #e2e8f0"
-    },
-    onMouseEnter: e => {
-      e.stopPropagation();
-      e.currentTarget.style.color = "#e74c3c";
-      e.currentTarget.style.backgroundColor = "#fee2e2";
-    },
-    onMouseLeave: e => {
-      e.stopPropagation();
-      e.currentTarget.style.color = "#94a3b8";
-      e.currentTarget.style.backgroundColor = "transparent";
-    }
-  }, "\u2715")))));
-}
-function PdfViewer({
-  pdfB64,
-  name
-}) {
-  const [pages, setPages] = useState([]);
-  const [status, setStatus] = useState("loading");
-  const [scale, setScale] = useState(1.4);
-  useEffect(() => {
-    if (!pdfB64) return;
-    setStatus("loading");
-    setPages([]);
-    const loadLib = () => new Promise((res, rej) => {
-      if (window.pdfjsLib) {
-        res(window.pdfjsLib);
-        return;
-      }
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
-      s.onload = () => {
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-        res(window.pdfjsLib);
-      };
-      s.onerror = rej;
-      document.head.appendChild(s);
-    });
-    (async () => {
-      try {
-        const lib = await loadLib();
-        const bin = atob(pdfB64);
-        const arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        const pdf = await lib.getDocument({
-          data: arr
-        }).promise;
-        const loaded = [];
-        for (let p = 1; p <= pdf.numPages; p++) loaded.push(await pdf.getPage(p));
-        setPages(loaded);
-        setStatus("ready");
-      } catch (e) {
-        setStatus("error");
-      }
-    })();
-  }, [pdfB64]);
-  useEffect(() => {
-    if (status !== "ready") return;
-    pages.forEach((page, i) => {
-      const canvas = document.getElementById("pdf-page-" + i);
-      if (!canvas) return;
-      const vp = page.getViewport({
-        scale
-      });
-      canvas.width = vp.width;
-      canvas.height = vp.height;
-      page.render({
-        canvasContext: canvas.getContext("2d"),
-        viewport: vp
-      });
-    });
-  }, [pages, status, scale]);
-  if (status === "loading") return /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: "60px",
-      color: "#64748b"
-    }
-  }, "\u23F3 PDF \uB80C\uB354\uB9C1 \uC911...");
-  if (status === "error") return /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      padding: "40px",
-      color: "#e74c3c"
-    }
-  }, "PDF \uC624\uB958");
-  return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "10px 16px",
-      background: "#f1f5f9",
-      borderBottom: "1px solid #e2e8f0"
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      fontWeight: 600
-    }
-  }, name), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: "#94a3b8",
-      marginLeft: "auto"
-    }
-  }, pages.length, "\uD398\uC774\uC9C0"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setScale(s => Math.max(0.6, s - 0.2)),
-    style: {
-      padding: "4px 10px",
-      borderRadius: 5,
-      border: "1px solid #cbd5e1",
-      background: "#fff",
-      cursor: "pointer",
-      fontSize: 13
-    }
-  }, "\u2212"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 12,
-      minWidth: 36,
-      textAlign: "center"
-    }
-  }, Math.round(scale * 100), "%"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setScale(s => Math.min(3, s + 0.2)),
-    style: {
-      padding: "4px 10px",
-      borderRadius: 5,
-      border: "1px solid #cbd5e1",
-      background: "#fff",
-      cursor: "pointer",
-      fontSize: 13
-    }
-  }, "+")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowY: "auto",
-      maxHeight: "80vh",
-      background: "#525659",
-      padding: "16px",
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: 8
-    }
-  }, pages.map((_, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      boxShadow: "0 2px 8px rgba(0,0,0,.4)"
-    }
-  }, /*#__PURE__*/React.createElement("canvas", {
-    id: "pdf-page-" + i,
-    style: {
-      display: "block"
-    }
-  })))));
-}
-const MAX_E = 3;
-const WFIELDS = [{
-  k: "date",
-  lb: "날짜",
-  tp: "date",
-  w: 130
-}, {
-  k: "desc",
-  lb: "용접내용",
-  w: 200,
-  hk: "desc"
-}, {
-  k: "procNo",
-  lb: "공정번호",
-  w: 105,
-  hk: "procNo"
-}, {
-  k: "welder",
-  lb: "용접사/ID",
-  w: 130,
-  hk: "welder"
-}, {
-  k: "method",
-  lb: "용접방법",
-  w: 105,
-  hk: "method",
-  pre: ["FCAW", "SMAW", "GTAW", "SAW", "GMAW", "EGW"]
-}, {
-  k: "wps",
-  lb: "WPS NO.",
-  w: 160,
-  hk: "wps"
-}, {
-  k: "part",
-  lb: "부품명",
-  w: 115,
-  hk: "part"
-}, {
-  k: "mat",
-  lb: "재질",
-  w: 175,
-  hk: "mat"
-}, {
-  k: "aws",
-  lb: "AWS No.",
-  w: 115,
-  hk: "aws"
-}, {
-  k: "heat",
-  lb: "Heat/Lot No.",
-  w: 135,
-  hk: "heat"
-}, {
-  k: "sz",
-  lb: "Size",
-  w: 90,
-  hk: "sz"
-}, {
-  k: "rmk",
-  lb: "비고",
-  w: 150,
-  hk: "rmk"
-}];
-const mkE = () => ({
-  date: "",
-  desc: "",
-  procNo: "",
-  welder: "",
-  method: "",
-  wps: "",
-  part: "",
-  mat: "",
-  aws: "",
-  heat: "",
-  sz: "",
-  rmk: ""
-});
-const mkF = () => ({
-  docNo: "",
-  cust: "",
-  proj: "",
-  prod: "",
-  drwNo: "",
-  pNos: [],
-  entries: [mkE()]
-});
-const TABS = ["📋 기본정보", "📦 제품번호", "🔧 작업내역", "📄 승인문서"];
-const HKEYS = ["docNo", "cust", "proj", "prod", "drwNo", "desc", "procNo", "welder", "method", "wps", "part", "mat", "aws", "heat", "sz", "rmk"];
-function App() {
-  const [tab, setTab] = useState(0);
-  const [form, setForm] = useState(mkF());
-  const [hist, setHist] = useState({});
-  const [pIn, setPIn] = useState("");
-  const [dragOver, setDragOver] = useState(false);
-  const [dlHref, setDlHref] = useState(null);
-  const [dlName, setDlName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [tpls, setTpls] = useState([]);
-  const [showSave, setShowSave] = useState(false);
-  const [showLoad, setShowLoad] = useState(false);
-  const [tplName, setTplName] = useState("");
-  const [pdfList, setPdfList] = useState([]);
-  const [selPdfB64, setSelPdfB64] = useState(null);
-  const [selPdfName, setSelPdfName] = useState("");
-  const [pdfDrag, setPdfDrag] = useState(false);
-  const pFR = useRef();
-  const pdfFR = useRef();
-  useEffect(() => {
-    const hh = {};
-    HKEYS.forEach(k => {
-      hh[k] = ls.get("wr:" + k);
-    });
-    setHist(hh);
-    const saved = ls.get("wr:tpls");
-    if (saved.length) setTpls(saved);
-    const pdfs = ls.get("wr:pdfList");
-    if (pdfs.length) {
-      setPdfList(pdfs);
-      const b64 = localStorage.getItem("wr:pdf:" + pdfs[0].name);
-      if (b64) {
-        setSelPdfB64(b64);
-        setSelPdfName(pdfs[0].name);
-      }
-    }
-  }, []);
-  const saveH = (k, v) => {
-    if (!v || !v.trim()) return;
-    const next = [v, ...(hist[k] || []).filter(x => x !== v)].slice(0, 20);
-    setHist(p => ({
-      ...p,
-      [k]: next
-    }));
-    ls.set("wr:" + k, next);
-  };
-  const delH = (k, v) => {
-    const next = (hist[k] || []).filter(x => x !== v);
-    setHist(p => ({
-      ...p,
-      [k]: next
-    }));
-    ls.set("wr:" + k, next);
-  };
-  const saveTpl = () => {
-    const name = tplName.trim();
-    if (!name) return;
-    const tpl = {
-      name,
-      date: new Date().toLocaleDateString("ko-KR"),
-      entries: form.entries
-    };
-    const next = [tpl, ...tpls.filter(t => t.name !== name)].slice(0, 30);
-    setTpls(next);
-    ls.set("wr:tpls", next);
-    setTplName("");
-    setShowSave(false);
-  };
-  const delTpl = name => {
-    const next = tpls.filter(t => t.name !== name);
-    setTpls(next);
-    ls.set("wr:tpls", next);
-  };
-  const loadTpl = tpl => {
-    setForm(p => ({
-      ...p,
-      entries: tpl.entries.map(e => ({
-        ...e
-      }))
-    }));
-    setShowLoad(false);
-  };
-  const uploadPdf = file => {
-    if (!file || file.type !== "application/pdf") {
-      alert("PDF만 가능합니다");
-      return;
-    }
-    const rd = new FileReader();
-    rd.onload = ev => {
-      const bytes = new Uint8Array(ev.target.result);
-      let bin = "";
-      for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
-      const b64 = btoa(bin);
-      try {
-        localStorage.setItem("wr:pdf:" + file.name, b64);
-      } catch (e) {
-        alert("저장 용량 초과. 파일이 너무 큽니다.");
-        return;
-      }
-      const next = [{
-        name: file.name
-      }, ...pdfList.filter(p => p.name !== file.name)].slice(0, 5);
-      setPdfList(next);
-      ls.set("wr:pdfList", next);
-      setSelPdfB64(b64);
-      setSelPdfName(file.name);
-    };
-    rd.readAsArrayBuffer(file);
-  };
-  const openPdf = item => {
-    if (selPdfName === item.name && selPdfB64) return;
-    const b64 = localStorage.getItem("wr:pdf:" + item.name);
-    if (!b64) {
-      alert("PDF를 찾을 수 없습니다");
-      return;
-    }
-    setSelPdfB64(b64);
-    setSelPdfName(item.name);
-  };
-  const removePdf = name => {
-    localStorage.removeItem("wr:pdf:" + name);
-    const next = pdfList.filter(p => p.name !== name);
-    setPdfList(next);
-    ls.set("wr:pdfList", next);
-    if (selPdfName === name) {
-      setSelPdfB64(null);
-      setSelPdfName("");
-    }
-  };
-  const upd = (k, v) => setForm(p => ({
-    ...p,
-    [k]: v
-  }));
-  const updE = (i, k, v) => setForm(p => {
-    const e = [...p.entries];
-    e[i] = {
-      ...e[i],
-      [k]: v
-    };
-    return {
-      ...p,
-      entries: e
-    };
-  });
-  const addE = () => {
-    if (form.entries.length < MAX_E) setForm(p => ({
-      ...p,
-      entries: [...p.entries, mkE()]
-    }));
-  };
-  const delE = i => setForm(p => {
-    const n = p.entries.filter((_, j) => j !== i);
-    return {
-      ...p,
-      entries: n.length ? n : [mkE()]
-    };
-  });
-  const hk = k => hist[k] || [];
-  const importP = file => {
-    if (!file) return;
-    const rd = new FileReader();
-    rd.onload = e => {
-      try {
-        const wb = XLSX.read(new Uint8Array(e.target.result), {
-          type: "array"
-        });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws, {
-          header: 1,
-          raw: false
-        });
-        const nos = [];
-        rows.forEach(r => (r || []).forEach(c => {
-          const s = String(c || "").trim();
-          if (s) nos.push(s);
-        }));
-        setForm(p => ({
-          ...p,
-          pNos: nos
-        }));
-      } catch (err) {
-        alert("파일 오류: " + err.message);
-      }
-    };
-    rd.readAsArrayBuffer(file);
-  };
-  const addP = () => {
-    const nos = pIn.split(/[\n,，、]/).map(s => s.trim()).filter(Boolean);
-    if (!nos.length) return;
-    setForm(p => ({
-      ...p,
-      pNos: [...new Set([...p.pNos, ...nos])]
-    }));
-    setPIn("");
-  };
-  const makeXlsx = async () => {
-    setBusy(true);
-    try {
-      const b64 = await buildExcelB64(form);
-      const mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-      setDlHref("data:" + mime + ";base64," + b64);
-      setDlName("용접기록서_" + (form.docNo || "draft") + ".xlsx");
-    } catch (err) {
-      alert("생성 오류: " + err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const C = bg => ({
-    background: bg || "#f8fafc"
-  });
-  const S = {
-    card: {
-      background: "#fff",
-      border: "0.5px solid #e2e8f0",
-      borderRadius: 10,
-      padding: "20px 22px",
-      marginBottom: 14
-    },
-    ct: {
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#1e293b",
-      marginBottom: 16,
-      paddingBottom: 11,
-      borderBottom: "0.5px solid #e2e8f0"
-    },
-    row: {
-      display: "flex",
-      gap: 14,
-      marginBottom: 14,
-      flexWrap: "wrap"
-    },
-    btn: c => ({
-      padding: "8px 16px",
-      borderRadius: 7,
-      border: "0.5px solid " + (c ? "transparent" : "#cbd5e1"),
-      background: c || "#f8fafc",
-      color: c ? "#fff" : "#1e293b",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 600
-    }),
-    pill: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 6,
-      background: "#f8fafc",
-      border: "1px solid #cbd5e1",
-      borderRadius: 20,
-      padding: "4px 12px",
-      fontSize: 12,
-      color: "#1e293b",
-      margin: "3px"
-    },
-    th: {
-      padding: "10px 8px",
-      fontSize: 12,
-      fontWeight: 700,
-      color: "#64748b",
-      background: "#f8fafc",
-      textAlign: "center",
-      whiteSpace: "nowrap",
-      border: "2px solid #64748b"
-    },
-    td: {
-      padding: "0",
-      verticalAlign: "middle",
-      background: "#fff",
-      border: "2px solid #94a3b8"
-    },
-    ta: {
-      width: "100%",
-      padding: "8px 10px",
-      border: "1.5px solid #cbd5e1",
-      borderRadius: 6,
-      fontSize: 13,
-      background: "#fff",
-      color: "#1e293b",
-      outline: "none",
-      resize: "vertical",
-      boxSizing: "border-box"
-    }
-  };
-  const DlBox = () => dlHref ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 14,
-      padding: "18px",
-      background: "#f0faf4",
-      border: "2px solid #a5d6a7",
-      borderRadius: 10,
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "#2e7d32",
-      marginBottom: 10,
-      fontWeight: 700
-    }
-  }, "\u2705 \uD30C\uC77C \uC900\uBE44 \uC644\uB8CC!"), /*#__PURE__*/React.createElement("a", {
-    href: dlHref,
-    download: dlName,
-    style: {
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 8,
-      background: "#27ae60",
-      color: "#fff",
-      padding: "12px 28px",
-      borderRadius: 8,
-      fontSize: 15,
-      fontWeight: 700,
-      textDecoration: "none"
-    }
-  }, "\uD83D\uDCC4 ", dlName, " \uC800\uC7A5")) : null;
-  return /*#__PURE__*/React.createElement("div", {
-    style: {
-      minHeight: "100vh",
-      background: "#f1f5f9"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#1a3a5c",
-      padding: "14px 22px",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between"
-    }
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#fff",
-      fontWeight: 700,
-      fontSize: 17
-    }
-  }, "\u26A1 \uC6A9\uC811\uAE30\uB85D\uC11C \uC790\uB3D9\uD654"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      color: "#90b8d8",
-      fontSize: 11,
-      marginTop: 2
-    }
-  }, "WELDING RECORD AUTOMATION SYSTEM")), /*#__PURE__*/React.createElement("button", {
-    onClick: makeXlsx,
-    disabled: busy,
-    style: {
-      background: busy ? "#999" : "#27ae60",
-      color: "#fff",
-      border: "none",
-      borderRadius: 8,
-      padding: "10px 20px",
-      fontWeight: 700,
-      fontSize: 14,
-      cursor: busy ? "default" : "pointer"
-    }
-  }, busy ? "생성 중..." : "📥 파일 생성")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#1e2d3d",
-      display: "flex",
-      padding: "0 18px"
-    }
-  }, TABS.map((t, i) => /*#__PURE__*/React.createElement("button", {
-    key: i,
-    onClick: () => setTab(i),
-    style: {
-      padding: "12px 18px",
-      fontSize: 13,
-      fontWeight: 600,
-      cursor: "pointer",
-      border: "none",
-      background: "none",
-      color: tab === i ? "#fff" : "#7fa8c9",
-      borderBottom: tab === i ? "3px solid #3b82f6" : "3px solid transparent",
-      transition: "color .15s"
-    }
-  }, t))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: "18px",
-      maxWidth: 1600,
-      margin: "0 auto"
-    }
-  }, tab === 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.ct
-  }, "\uBB38\uC11C \uAE30\uBCF8\uC815\uBCF4"), /*#__PURE__*/React.createElement("div", {
-    style: S.row
-  }, /*#__PURE__*/React.createElement(AutoIn, {
-    lb: "\uBB38\uC11C\uBC88\uD638",
-    v: form.docNo,
-    h: hk("docNo"),
-    ph: "\uC608) WR-NCD230801",
-    onChange: v => upd("docNo", v),
-    onSave: v => saveH("docNo", v),
-    onDelete: v => delH("docNo", v),
-    style: {
-      flex: 1
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: S.row
-  }, /*#__PURE__*/React.createElement(AutoIn, {
-    lb: "\uACE0\uAC1D",
-    v: form.cust,
-    h: hk("cust"),
-    ph: "\uC608) KHNP",
-    onChange: v => upd("cust", v),
-    onSave: v => saveH("cust", v),
-    onDelete: v => delH("cust", v),
-    style: {
-      flex: 1
-    }
-  }), /*#__PURE__*/React.createElement(AutoIn, {
-    lb: "\uACF5\uC0AC\uBA85",
-    v: form.proj,
-    h: hk("proj"),
-    ph: "\uC608) SAEUL #3,4 M254",
-    onChange: v => upd("proj", v),
-    onSave: v => saveH("proj", v),
-    onDelete: v => delH("proj", v),
-    style: {
-      flex: 2
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: S.row
-  }, /*#__PURE__*/React.createElement(AutoIn, {
-    lb: "\uC81C\uD488\uBA85",
-    v: form.prod,
-    h: hk("prod"),
-    ph: "\uC608) Control Damper",
-    onChange: v => upd("prod", v),
-    onSave: v => saveH("prod", v),
-    onDelete: v => delH("prod", v),
-    style: {
-      flex: 2
-    }
-  }), /*#__PURE__*/React.createElement(AutoIn, {
-    lb: "\uB3C4\uBA74\uBC88\uD638",
-    v: form.drwNo,
-    h: hk("drwNo"),
-    ph: "\uC608) M254-DG-A02-05 Rev.3",
-    onChange: v => upd("drwNo", v),
-    onSave: v => saveH("drwNo", v),
-    onDelete: v => delH("drwNo", v),
-    style: {
-      flex: 2
-    }
-  }))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.card,
-      background: "#f0f7ff",
-      border: "0.5px solid #bed3f5"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13,
-      color: "#1a3a5c"
-    }
-  }, "\uD83D\uDCA1 \uC785\uB825 \uC774\uB825\uC740 \uC774 \uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC800\uC7A5\uB429\uB2C8\uB2E4.")), /*#__PURE__*/React.createElement(DlBox, null)), tab === 1 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.ct
-  }, "\uC81C\uD488\uBC88\uD638 \uC785\uB825"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 18
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      marginBottom: 7,
-      fontWeight: 600
-    }
-  }, "\uD83D\uDCCE \uC5D1\uC140 \uD30C\uC77C \uB4DC\uB798\uADF8 \uB610\uB294 \uC120\uD0DD"), /*#__PURE__*/React.createElement("div", {
-    onDragOver: e => {
-      e.preventDefault();
-      setDragOver(true);
-    },
-    onDragLeave: () => setDragOver(false),
-    onDrop: e => {
-      e.preventDefault();
-      setDragOver(false);
-      importP(e.dataTransfer.files[0]);
-    },
-    onClick: () => pFR.current.click(),
-    style: {
-      border: dragOver ? "2.5px solid #3b82f6" : "2px dashed #94a3b8",
-      borderRadius: 10,
-      padding: "32px 20px",
-      textAlign: "center",
-      cursor: "pointer",
-      background: dragOver ? "#eff6ff" : "#f8fafc"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 36,
-      marginBottom: 8
-    }
-  }, "\uD83D\uDCC2"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 700,
-      color: dragOver ? "#1d4ed8" : "#1e293b",
-      marginBottom: 4
-    }
-  }, dragOver ? "여기에 놓으세요!" : "엑셀 파일을 드래그하세요"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b"
-    }
-  }, "\uD074\uB9AD\uD574\uC11C \uC120\uD0DD \xB7 xlsx/xls/csv")), /*#__PURE__*/React.createElement("input", {
-    ref: pFR,
-    type: "file",
-    accept: ".xlsx,.xls,.csv",
-    style: {
-      display: "none"
-    },
-    onChange: e => {
-      importP(e.target.files[0]);
-      e.target.value = "";
-    }
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      borderTop: "0.5px solid #e2e8f0",
-      paddingTop: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      marginBottom: 7,
-      fontWeight: 600
-    }
-  }, "\u270F\uFE0F \uC9C1\uC811 \uC785\uB825 (\uC904\uBC14\uAFC8/\uC27C\uD45C \uAD6C\uBD84)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10
-    }
-  }, /*#__PURE__*/React.createElement("textarea", {
-    style: {
-      ...S.ta,
-      height: 90,
-      flex: 1
-    },
-    value: pIn,
-    onChange: e => setPIn(e.target.value),
-    placeholder: "0-624-Y-VR-0001\n0-624-Y-VR-0002"
-  }), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...S.btn("#1a3a5c"),
-      alignSelf: "flex-start"
-    },
-    onClick: addP
-  }, "+ \uCD94\uAC00")))), /*#__PURE__*/React.createElement("div", {
-    style: S.card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.ct,
-      marginBottom: 0
-    }
-  }, "\uB4F1\uB85D\uB41C \uC81C\uD488\uBC88\uD638"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#e8f5e9",
-      border: "1px solid #a5d6a7",
-      borderRadius: 7,
-      padding: "6px 14px",
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#2e7d32"
-    }
-  }, form.pNos.length > 0 ? "수량: " + form.pNos.length + " Sets" : "수량: -")), form.pNos.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      color: "#94a3b8",
-      padding: "28px 0",
-      fontSize: 13
-    }
-  }, "\uB4F1\uB85D\uB41C \uC81C\uD488\uBC88\uD638\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexWrap: "wrap"
-    }
-  }, form.pNos.map((n, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: S.pill
-  }, /*#__PURE__*/React.createElement("span", null, n), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      color: "#e74c3c",
-      fontSize: 13
-    },
-    onClick: () => setForm(p => ({
-      ...p,
-      pNos: p.pNos.filter((_, j) => j !== i)
-    }))
-  }, "\u2715")))), form.pNos.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 14,
-      display: "flex",
-      justifyContent: "flex-end"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: S.btn(),
-    onClick: () => setForm(p => ({
-      ...p,
-      pNos: []
-    }))
-  }, "\uC804\uCCB4 \uC0AD\uC81C")))), tab === 2 && /*#__PURE__*/React.createElement("div", null, showSave && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.45)",
-      zIndex: 9999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      borderRadius: 12,
-      padding: "28px 32px",
-      width: 380,
-      boxShadow: "0 12px 40px rgba(0,0,0,.25)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 16,
-      fontWeight: 700,
-      color: "#1a3a5c",
-      marginBottom: 16
-    }
-  }, "\uD83D\uDCBE \uD15C\uD50C\uB9BF \uC800\uC7A5"), /*#__PURE__*/React.createElement("input", {
-    value: tplName,
-    onChange: e => setTplName(e.target.value),
-    placeholder: "\uD15C\uD50C\uB9BF \uC774\uB984",
-    style: {
-      width: "100%",
-      padding: "9px 12px",
-      border: "1.5px solid #94a3b8",
-      borderRadius: 7,
-      fontSize: 13,
-      boxSizing: "border-box",
-      outline: "none",
-      marginBottom: 16
-    },
-    onKeyDown: e => {
-      if (e.key === "Enter") saveTpl();
-    },
-    autoFocus: true
-  }), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 10,
-      justifyContent: "flex-end"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      padding: "8px 18px",
-      borderRadius: 7,
-      border: "0.5px solid #94a3b8",
-      background: "#f8fafc",
-      cursor: "pointer",
-      fontSize: 13
-    },
-    onClick: () => {
-      setShowSave(false);
-      setTplName("");
-    }
-  }, "\uCDE8\uC18C"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      padding: "8px 18px",
-      borderRadius: 7,
-      border: "none",
-      background: "#1a3a5c",
-      color: "#fff",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 700
-    },
-    onClick: saveTpl
-  }, "\uC800\uC7A5")))), showLoad && /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,.45)",
-      zIndex: 9999,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: "#fff",
-      borderRadius: 12,
-      padding: "28px 32px",
-      width: 480,
-      maxHeight: "70vh",
-      display: "flex",
-      flexDirection: "column",
-      boxShadow: "0 12px 40px rgba(0,0,0,.25)"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 16,
-      fontWeight: 700,
-      color: "#1a3a5c",
-      marginBottom: 16
-    }
-  }, "\uD83D\uDCC2 \uD15C\uD50C\uB9BF \uBD88\uB7EC\uC624\uAE30"), tpls.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    style: {
-      textAlign: "center",
-      color: "#94a3b8",
-      padding: "30px 0",
-      fontSize: 14
-    }
-  }, "\uC800\uC7A5\uB41C \uD15C\uD50C\uB9BF\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowY: "auto",
-      flex: 1
-    }
-  }, tpls.map((t, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "12px 14px",
-      borderRadius: 8,
-      border: "1px solid #e2e8f0",
-      marginBottom: 8,
-      background: "#f8fafc"
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 700,
-      color: "#1a3a5c"
-    }
-  }, t.name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b",
-      marginTop: 2
-    }
-  }, t.date, " \xB7 ", t.entries.length, "\uD589")), /*#__PURE__*/React.createElement("button", {
-    style: {
-      padding: "7px 14px",
-      borderRadius: 6,
-      border: "none",
-      background: "#1a3a5c",
-      color: "#fff",
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 600
-    },
-    onClick: () => loadTpl(t)
-  }, "\uBD88\uB7EC\uC624\uAE30"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      padding: "7px 10px",
-      borderRadius: 6,
-      border: "1px solid #fca5a5",
-      background: "#fff5f5",
-      color: "#e74c3c",
-      cursor: "pointer",
-      fontSize: 12
-    },
-    onClick: () => delTpl(t.name)
-  }, "\uC0AD\uC81C")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 16,
-      display: "flex",
-      justifyContent: "flex-end"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      padding: "8px 18px",
-      borderRadius: 7,
-      border: "0.5px solid #94a3b8",
-      background: "#f8fafc",
-      cursor: "pointer",
-      fontSize: 13
-    },
-    onClick: () => setShowLoad(false)
-  }, "\uB2EB\uAE30")))), /*#__PURE__*/React.createElement("div", {
-    style: S.card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 16
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.ct,
-      marginBottom: 0
-    }
-  }, "\uC791\uC5C5 \uB0B4\uC5ED (", form.entries.length, " / ", MAX_E, "\uD589)"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 8
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...S.btn(),
-      fontSize: 12,
-      padding: "7px 13px"
-    },
-    onClick: () => setShowLoad(true)
-  }, "\uD83D\uDCC2 \uBD88\uB7EC\uC624\uAE30"), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...S.btn("#475569"),
-      fontSize: 12,
-      padding: "7px 13px"
-    },
-    onClick: () => setShowSave(true)
-  }, "\uD83D\uDCBE \uD15C\uD50C\uB9BF \uC800\uC7A5"), /*#__PURE__*/React.createElement("button", {
-    style: S.btn(form.entries.length < MAX_E ? "#1a3a5c" : undefined),
-    onClick: addE,
-    disabled: form.entries.length >= MAX_E
-  }, "+ \uD589 \uCD94\uAC00"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      overflowX: "auto"
-    }
-  }, /*#__PURE__*/React.createElement("table", {
-    style: {
-      borderCollapse: "collapse",
-      minWidth: 1500
-    }
-  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
-    style: {
-      ...S.th,
-      width: 50
-    }
-  }, "\uC21C\uBC88"), WFIELDS.map(f => /*#__PURE__*/React.createElement("th", {
-    key: f.k,
-    style: {
-      ...S.th,
-      minWidth: f.w,
-      width: f.w
-    }
-  }, f.lb)), /*#__PURE__*/React.createElement("th", {
-    style: {
-      ...S.th,
-      width: 50
-    }
-  }, "\uC0AD\uC81C"))), /*#__PURE__*/React.createElement("tbody", null, form.entries.map((en, i) => /*#__PURE__*/React.createElement("tr", {
-    key: i
-  }, /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...S.td,
-      textAlign: "center",
-      fontSize: 15,
-      fontWeight: 700,
-      color: "#64748b",
-      width: 50
-    }
-  }, i + 1), WFIELDS.map(f => /*#__PURE__*/React.createElement("td", {
-    key: f.k,
-    style: {
-      ...S.td,
-      minWidth: f.w,
-      width: f.w,
-      height: 56
-    }
-  }, f.tp === "date" ? /*#__PURE__*/React.createElement("input", {
-    type: "date",
-    value: en[f.k],
-    style: {
-      width: "100%",
-      padding: "8px",
-      border: "none",
-      fontSize: 13,
-      background: "transparent",
-      color: "#1e293b",
-      outline: "none"
-    },
-    onChange: e => updE(i, f.k, e.target.value)
-  }) : /*#__PURE__*/React.createElement(AutoIn, {
-    v: en[f.k],
-    h: [...(f.pre || []), ...hk(f.hk || f.k)],
-    onChange: v => updE(i, f.k, v),
-    onSave: v => saveH(f.hk || f.k, v),
-    onDelete: v => delH(f.hk || f.k, v),
-    style: {
-      width: "100%"
-    }
-  }))), /*#__PURE__*/React.createElement("td", {
-    style: {
-      ...S.td,
-      textAlign: "center",
-      width: 50
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      color: "#e74c3c",
-      fontSize: 18,
-      fontWeight: 700
-    },
-    onClick: () => delE(i)
-  }, "\u2715")))))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.card,
-      textAlign: "center"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "#27ae60",
-      color: "#fff",
-      border: "none",
-      borderRadius: 9,
-      padding: "13px 36px",
-      fontWeight: 700,
-      fontSize: 15,
-      cursor: "pointer",
-      marginBottom: 8
-    },
-    onClick: makeXlsx
-  }, "\uD83D\uDCE5 \uC5D1\uC140 \uD30C\uC77C \uC0DD\uC131"), /*#__PURE__*/React.createElement(DlBox, null))), tab === 3 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: S.card
-  }, /*#__PURE__*/React.createElement("div", {
-    style: S.ct
-  }, "\uD83D\uDCC4 \uC2B9\uC778\uBB38\uC11C \uAD00\uB9AC"), /*#__PURE__*/React.createElement("div", {
-    onDragOver: e => {
-      e.preventDefault();
-      setPdfDrag(true);
-    },
-    onDragLeave: () => setPdfDrag(false),
-    onDrop: e => {
-      e.preventDefault();
-      setPdfDrag(false);
-      uploadPdf(e.dataTransfer.files[0]);
-    },
-    onClick: () => pdfFR.current.click(),
-    style: {
-      border: pdfDrag ? "2.5px solid #3b82f6" : "2px dashed #94a3b8",
-      borderRadius: 10,
-      padding: "24px 20px",
-      textAlign: "center",
-      cursor: "pointer",
-      background: pdfDrag ? "#eff6ff" : "#f8fafc",
-      marginBottom: pdfList.length ? 14 : 0
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 30,
-      marginBottom: 6
-    }
-  }, "\uD83D\uDCCE"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 14,
-      fontWeight: 700,
-      color: pdfDrag ? "#1d4ed8" : "#1e293b",
-      marginBottom: 4
-    }
-  }, pdfDrag ? "여기에 놓으세요!" : "승인문서(PDF) 업로드"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: "#64748b"
-    }
-  }, "\uBE0C\uB77C\uC6B0\uC800\uC5D0 \uC800\uC7A5 \xB7 \uCD5C\uB300 5\uAC1C")), /*#__PURE__*/React.createElement("input", {
-    ref: pdfFR,
-    type: "file",
-    accept: "application/pdf",
-    style: {
-      display: "none"
-    },
-    onChange: e => {
-      uploadPdf(e.target.files[0]);
-      e.target.value = "";
-    }
-  }), pdfList.length > 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
-      marginTop: 12
-    }
-  }, pdfList.map((p, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => openPdf(p),
-    style: {
-      padding: "8px 14px",
-      borderRadius: 8,
-      cursor: "pointer",
-      fontSize: 13,
-      fontWeight: 600,
-      border: selPdfName === p.name ? "2px solid #3b82f6" : "1px solid #e2e8f0",
-      background: selPdfName === p.name ? "#eff6ff" : "#f8fafc",
-      color: selPdfName === p.name ? "#1d4ed8" : "#334155"
-    }
-  }, "\uD83D\uDCC4 ", p.name), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      cursor: "pointer",
-      color: "#94a3b8",
-      fontSize: 13
-    },
-    onClick: () => removePdf(p.name)
-  }, "\u2715"))))), selPdfB64 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.card,
-      padding: 0,
-      overflow: "hidden"
-    }
-  }, /*#__PURE__*/React.createElement(PdfViewer, {
-    pdfB64: selPdfB64,
-    name: selPdfName
-  })), pdfList.length === 0 && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...S.card,
-      textAlign: "center",
-      color: "#94a3b8",
-      padding: "50px",
-      fontSize: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 40,
-      marginBottom: 12
-    }
-  }, "\uD83D\uDCCB"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 600,
-      marginBottom: 8
-    }
-  }, "\uC5C5\uB85C\uB4DC\uB41C \uC2B9\uC778\uBB38\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 13
-    }
-  }, "PDF\uB97C \uC5C5\uB85C\uB4DC\uD558\uBA74 \uB2E4\uC74C \uBC29\uBB38 \uC2DC\uC5D0\uB3C4 \uC720\uC9C0\uB429\uB2C8\uB2E4.")))));
-}
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 
+/* ── 시작 ── */
+init();
 </script>
 </body>
 </html>
