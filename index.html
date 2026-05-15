@@ -308,12 +308,17 @@ function init() {
 
   // PDF 목록 로드
   state.pdfList = ls.get("wr:pdfList");
-  if (state.pdfList.length) {
-    renderPdfBtns();
-    const b64 = localStorage.getItem("wr:pdf:"+state.pdfList[0].name);
-    if (b64) { state.selPdf = b64; state.selPdfName = state.pdfList[0].name; renderPdfViewer(); }
-  }
+  renderPdfBtns();
   updatePdfEmpty();
+  if (state.pdfList.length) {
+    pdfDB.load(state.pdfList[0].name).then(ab => {
+      if (ab) {
+        state.selPdf = ab2b64(ab);
+        state.selPdfName = state.pdfList[0].name;
+        renderPdfViewer();
+      }
+    });
+  }
 }
 
 /* ── 탭 전환 ── */
@@ -572,14 +577,14 @@ function closeLoadDlg() { document.getElementById("loadDlg").classList.add("hidd
 function uploadPdf(file) {
   if (!file || file.type!=="application/pdf") { alert("PDF 파일만 가능합니다"); return; }
   const reader = new FileReader();
-  reader.onload = ev => {
-    const bytes = new Uint8Array(ev.target.result);
-    let bin="";
-    for(let i=0;i<bytes.length;i+=8192) bin+=String.fromCharCode(...bytes.subarray(i,i+8192));
-    const b64 = btoa(bin);
-    try { localStorage.setItem("wr:pdf:"+file.name, b64); }
-    catch(e) { alert("저장 용량 초과. 파일이 너무 큽니다."); return; }
-    state.pdfList = [{name:file.name}, ...state.pdfList.filter(p=>p.name!==file.name)].slice(0,5);
+  reader.onload = async ev => {
+    try {
+      await pdfDB.save(file.name, ev.target.result);
+    } catch(e) { alert("PDF 저장 오류: "+e.message); return; }
+    // base64로 변환해 뷰어에 표시
+    const b64 = ab2b64(ev.target.result);
+    state.selPdf = b64; state.selPdfName = file.name;
+    state.pdfList = [{name:file.name}, ...state.pdfList.filter(p=>p.name!==file.name)].slice(0,10);
     ls.set("wr:pdfList", state.pdfList);
     state.selPdf = b64; state.selPdfName = file.name;
     renderPdfBtns(); renderPdfViewer(); updatePdfEmpty();
@@ -593,15 +598,16 @@ function renderPdfBtns() {
     const btn = document.createElement("button"); btn.className="btn";
     btn.style.cssText = (state.selPdfName===p.name ? "border:2px solid #3b82f6;background:#eff6ff;color:#1d4ed8;" : "border-color:#e2e8f0;") + "font-size:13px;font-weight:600";
     btn.textContent = "📄 "+p.name;
-    btn.onclick = () => {
-      const b64 = localStorage.getItem("wr:pdf:"+p.name);
-      if (!b64) { alert("PDF를 찾을 수 없습니다"); return; }
-      state.selPdf=b64; state.selPdfName=p.name;
+    btn.onclick = async () => {
+      if (state.selPdfName===p.name && state.selPdf) { return; }
+      const ab = await pdfDB.load(p.name);
+      if (!ab) { alert("PDF를 찾을 수 없습니다"); return; }
+      state.selPdf=ab2b64(ab); state.selPdfName=p.name;
       renderPdfBtns(); renderPdfViewer();
     };
     const del = document.createElement("button"); del.style.cssText="background:none;border:none;color:#94a3b8;font-size:13px;cursor:pointer"; del.textContent="✕";
-    del.onclick = () => {
-      localStorage.removeItem("wr:pdf:"+p.name);
+    del.onclick = async () => {
+      await pdfDB.remove(p.name);
       state.pdfList = state.pdfList.filter(x=>x.name!==p.name);
       ls.set("wr:pdfList",state.pdfList);
       if(state.selPdfName===p.name){state.selPdf=null;state.selPdfName="";document.getElementById("pdfViewer").innerHTML="";}
