@@ -247,6 +247,7 @@ const state = {
   pdfList: [],
   selPdf: null,
   selPdfName: "",
+  pdfScale: 1.4,
   activeTab: 0,
 };
 
@@ -669,6 +670,8 @@ function renderPdfBtns() {
 function updatePdfEmpty() {
   document.getElementById("pdfEmpty").style.display = state.pdfList.length ? "none" : "";
 }
+let _pdfDoc = null;
+
 function renderPdfViewer() {
   if (!state.selPdf) return;
   const wrap = document.getElementById("pdfViewer");
@@ -683,18 +686,57 @@ function renderPdfViewer() {
   loadPdfJs(async lib => {
     const bin=atob(state.selPdf); const arr=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-    const pdf = await lib.getDocument({data:arr}).promise;
-    wrap.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><div id="pdfPages" style="background:#525659;padding:16px;display:flex;flex-direction:column;align-items:center;gap:8px;max-height:80vh;overflow-y:auto"></div></div>';
-    const pages = document.getElementById("pdfPages");
-    for(let i=1;i<=pdf.numPages;i++) {
-      const page = await pdf.getPage(i);
-      const vp = page.getViewport({scale:1.4});
-      const canvas=document.createElement("canvas");
-      canvas.width=vp.width;canvas.height=vp.height;canvas.style.boxShadow="0 2px 8px rgba(0,0,0,.4)";
-      pages.appendChild(canvas);
-      page.render({canvasContext:canvas.getContext("2d"),viewport:vp});
-    }
+    _pdfDoc = await lib.getDocument({data:arr}).promise;
+
+    wrap.innerHTML = `
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;background:#f1f5f9;border-bottom:1px solid #e2e8f0;flex-wrap:wrap">
+          <span style="font-size:12px;color:#64748b;font-weight:600" id="pdfName">${state.selPdfName}</span>
+          <span style="font-size:12px;color:#94a3b8" id="pdfPageCount"></span>
+          <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+            <button onclick="changePdfScale(-0.2)" style="width:32px;height:32px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
+            <span id="pdfScaleLabel" style="font-size:13px;font-weight:600;color:#1e293b;min-width:44px;text-align:center">${Math.round(state.pdfScale*100)}%</span>
+            <button onclick="changePdfScale(0.2)" style="width:32px;height:32px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>
+            <button onclick="resetPdfScale()" style="padding:6px 12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;font-size:12px;cursor:pointer;color:#64748b">초기화</button>
+          </div>
+        </div>
+        <div id="pdfPages" style="background:#525659;padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px;max-height:80vh;overflow-y:auto"></div>
+      </div>`;
+    renderPdfPages();
   });
+}
+
+async function renderPdfPages() {
+  if (!_pdfDoc) return;
+  const pages = document.getElementById("pdfPages");
+  if (!pages) return;
+  pages.innerHTML = "";
+  const count = _pdfDoc.numPages;
+  const countEl = document.getElementById("pdfPageCount");
+  if (countEl) countEl.textContent = count + "페이지";
+  for (let i=1; i<=count; i++) {
+    const page = await _pdfDoc.getPage(i);
+    const vp = page.getViewport({scale: state.pdfScale});
+    const canvas = document.createElement("canvas");
+    canvas.width = vp.width; canvas.height = vp.height;
+    canvas.style.cssText = "box-shadow:0 2px 12px rgba(0,0,0,.5);max-width:100%;";
+    pages.appendChild(canvas);
+    page.render({canvasContext: canvas.getContext("2d"), viewport: vp});
+  }
+  const label = document.getElementById("pdfScaleLabel");
+  if (label) label.textContent = Math.round(state.pdfScale*100)+"%";
+}
+
+function changePdfScale(delta) {
+  const next = Math.round((state.pdfScale + delta) * 10) / 10;
+  if (next < 0.4 || next > 3.0) return;
+  state.pdfScale = next;
+  renderPdfPages();
+}
+
+function resetPdfScale() {
+  state.pdfScale = 1.4;
+  renderPdfPages();
 }
 
 
