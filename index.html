@@ -260,6 +260,56 @@ const ls = {
   set(k,v) { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
 
+/* ── IndexedDB PDF 저장소 ── */
+const pdfDB = (() => {
+  const DB_NAME = 'weldingPDF', STORE = 'pdfs', VERSION = 1;
+  function openDB() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB_NAME, VERSION);
+      req.onupgradeneeded = e => e.target.result.createObjectStore(STORE);
+      req.onsuccess = e => res(e.target.result);
+      req.onerror   = e => rej(e.target.error);
+    });
+  }
+  return {
+    async save(name, arrayBuffer) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put(arrayBuffer, name);
+        tx.oncomplete = () => res();
+        tx.onerror    = e => rej(e.target.error);
+      });
+    },
+    async load(name) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const req = db.transaction(STORE, 'readonly').objectStore(STORE).get(name);
+        req.onsuccess = e => res(e.target.result || null);
+        req.onerror   = e => rej(e.target.error);
+      });
+    },
+    async remove(name) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(name);
+        tx.oncomplete = () => res();
+        tx.onerror    = e => rej(e.target.error);
+      });
+    },
+  };
+})();
+
+/* ArrayBuffer → base64 */
+function ab2b64(ab) {
+  const bytes = new Uint8Array(ab);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192)
+    bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  return btoa(bin);
+}
+
 /* ── 초기화 ── */
 function init() {
   document.getElementById("jsRunning").style.display = "none";
